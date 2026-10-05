@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Log in to Track The Track and pick up where your season left off." />
+    <meta name="theme-color" content="#10261f" />
+    <title>Log in | Track The Track</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="login.css" />
+    <script src="script.js" defer></script>
+    <script src="login.js" defer></script>
+  </head>
+  <body class="login-page">
+    <main class="login-layout">
+      <aside class="login-story" aria-label="Every effort adds up">
+        <a class="brand login-brand" href="index.html" aria-label="Track The Track home">
+          <svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true">
+            <circle cx="21" cy="21" r="17" />
+            <circle cx="21" cy="21" r="10" />
+            <path d="M21 4v34" />
+          </svg>
+          <span>Track <em>the</em> Track</span>
+        </a>
+
+        <div class="login-story-content">
+          <p class="eyebrow eyebrow-light"><span></span>Keep showing up</p>
+          <h2>Every second.<br />Every season.<br /><em>Every you.</em></h2>
+          <p class="login-story-intro">The early starts. The finish lines. The little wins.<br />Your story is still being written.</p>
+
+          <div class="login-track" aria-hidden="true">
+            <div class="login-track-lane"></div>
+            <div class="login-track-lane"></div>
+            <div class="login-track-lane"></div>
+            <div class="login-track-lane"></div>
+            <span class="login-track-runner"></span>
+            <span class="login-lane-number">01</span>
+            <span class="login-lane-number">02</span>
+            <span class="login-lane-number">03</span>
+          </div>
+
+          <div class="login-milestone" aria-label="Example personal record: 100 meters in 11.84 seconds">
+            <span class="milestone-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m13 3-9 11h7l-1 7 10-12h-7l1-6Z" /></svg>
+            </span>
+            <div><span>Small steps. New bests.</span><strong>100m <span class="milestone-dot">&middot;</span> 11.84s</strong></div>
+            <span class="milestone-tag">PR</span>
+          </div>
+        </div>
+
+        <p class="login-story-footer"><span></span>Made for athletes who keep showing up.</p>
+      </aside>
+
+      <section class="login-form-panel" aria-labelledby="login-heading">
+        <a class="login-home" href="index.html"><span aria-hidden="true">&larr;</span> Back to home</a>
+
+        <div class="login-form-wrap">
+          <div class="login-form-heading">
+            <p class="eyebrow"><span></span>Your season continues</p>
+            <h1 id="login-heading" tabindex="-1">Welcome back.</h1>
+            <p id="login-intro">Ready for your next mark? Log in to your account.</p>
+          </div>
+
+          <form id="login-form" method="post" novalidate>
+            <div class="login-field">
+              <label for="email">Email address</label>
+              <div class="login-input-wrap">
+                <svg class="login-input-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m3 6 9 7 9-7" /></svg>
+                <input id="email" name="email" type="email" autocomplete="username" inputmode="email" placeholder="you@example.com" aria-describedby="email-error" required />
+              </div>
+              <p class="login-field-error" id="email-error" hidden></p>
+            </div>
+
+            <div class="login-field" id="password-field">
+              <div class="login-label-row">
+                <label for="password">Password</label>
+                <button class="login-text-button" id="forgot-password" type="button">Forgot password?</button>
+              </div>
+              <div class="login-input-wrap">
+                <svg class="login-input-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="3" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></svg>
+                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" aria-describedby="password-error caps-lock-note" required />
+                <button class="password-toggle" id="password-toggle" type="button" aria-label="Show password" aria-pressed="false" aria-controls="password">
+                  <svg class="eye-show" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+                  <svg class="eye-hide" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10 5.2a12 12 0 0 1 2-.2c6.5 0 10 7 10 7a16 16 0 0 1-3.1 3.9M6.1 6.1A17 17 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.2-1.2M10 10a3 3 0 0 0 4 4" /></svg>
+                </button>
+              </div>
+              <p class="login-field-error" id="password-error" hidden></p>
+              <p class="login-caps-note" id="caps-lock-note" role="status" hidden>Caps Lock is on.</p>
+            </div>
+
+            <label class="login-remember" id="remember-field">
+              <input id="remember-email" type="checkbox" name="remember-email" />
+              <span>Remember my email</span>
+            </label>
+
+            <div class="login-notice" id="login-notice" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+
+            <button class="button button-primary login-submit" id="login-submit" type="submit" disabled>
+              <span id="submit-label">Log in</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg>
+            </button>
+            <button class="login-text-button login-back" id="back-to-login" type="button" hidden><span aria-hidden="true">&larr;</span> Back to log in</button>
+            <noscript><p class="login-noscript">Please enable JavaScript to use the login form.</p></noscript>
+          </form>
+
+          <p class="login-new" id="login-new">New to Track The Track? <a href="signup.html">Sign up <span aria-hidden="true">&nearr;</span></a></p>
+          <div class="login-form-note"><span class="login-note-line"></span><span>Your effort. Your progress. Your story.</span><span class="login-note-line"></span></div>
+        </div>
+
+        <footer class="login-footer">&copy; <span id="current-year">2026</span> Track The Track <span aria-hidden="true">&middot;</span> Own your season.</footer>
+      </section>
+    </main>
+  </body>
+</html>
