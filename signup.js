@@ -4,6 +4,9 @@ const emailInput = document.querySelector("#email");
 const passwordInput = document.querySelector("#password");
 const confirmPasswordInput = document.querySelector("#confirm-password");
 const notice = document.querySelector("#signup-notice");
+const auth = window.TrackAuth;
+const submit = document.querySelector('#signup-submit');
+let busy = false;
 const signupInputs = [nameInput, emailInput, passwordInput, confirmPasswordInput];
 
 function setFieldError(input, message) {
@@ -46,8 +49,9 @@ document.querySelectorAll("[data-password-toggle]").forEach((button) => {
   });
 });
 
-signupForm.addEventListener("submit", (event) => {
+signupForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (busy || !auth?.client) return;
   notice.hidden = true;
   notice.textContent = "";
   nameInput.value = nameInput.value.trim();
@@ -79,9 +83,45 @@ signupForm.addEventListener("submit", (event) => {
     return;
   }
 
-  // Account creation needs an authentication service. Never store credentials locally.
-  notice.hidden = false;
-  notice.textContent = "Account creation isn’t available yet. Please try again once accounts are enabled.";
+  busy = true;
+  submit.disabled = true;
+  signupForm.setAttribute("aria-busy", "true");
+  document.querySelector("#submit-label").textContent = "Creating account…";
+  try {
+    const { data, error } = await auth.client.auth.signUp({
+      email: emailInput.value,
+      password: passwordInput.value,
+      options: {
+        data: { display_name: nameInput.value },
+        emailRedirectTo: auth.pageUrl("login.html"),
+      },
+    });
+    if (error) throw error;
+    passwordInput.value = "";
+    confirmPasswordInput.value = "";
+    if (data.session) {
+      window.location.replace("dashboard.html");
+    } else {
+      notice.hidden = false;
+      notice.textContent = "Check your inbox for a confirmation link. Confirm your email, then log in. If you already have an account, log in or reset your password.";
+    }
+  } catch (error) {
+    notice.hidden = false;
+    notice.textContent = auth.errorMessage(error);
+  } finally {
+    busy = false;
+    submit.disabled = false;
+    signupForm.setAttribute("aria-busy", "false");
+    document.querySelector("#submit-label").textContent = "Create account";
+  }
 });
 
-document.querySelector("#signup-submit").disabled = false;
+if (auth?.client) {
+  submit.disabled = false;
+  auth.client.auth.getSession().then(({ data }) => {
+    if (data.session && !busy) window.location.replace("dashboard.html");
+  }).catch(() => {});
+} else {
+  notice.hidden = false;
+  notice.textContent = auth?.unavailableMessage || "Sign-up couldn’t load. Refresh the page and try again.";
+}

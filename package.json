@@ -1,0 +1,16 @@
+{
+  "name": "track-the-track",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static Track The Track website with Supabase authentication",
+  "scripts": {
+    "build": "node scripts/vendor-supabase.mjs",
+    "test": "node --test tests/auth.test.cjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.2"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
