@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Log in to Track The Track and pick up where your season left off." />
     <meta name="theme-color" content="#10261f" />
+    <meta name="referrer" content="no-referrer" />
     <title>Log in | Track The Track</title>
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="login.css" />
     <script src="script.js" defer></script>
+    <script src="vendor/supabase.js" defer></script>
+    <script src="auth.js" defer></script>
     <script src="login.js" defer></script>
   </head>
   <body class="login-page">
@@ -62,7 +65,7 @@
           </div>
 
           <form id="login-form" method="post" novalidate>
-            <div class="login-field">
+            <div class="login-field" id="email-field">
               <label for="email">Email address</label>
               <div class="login-input-wrap">
                 <svg class="login-input-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m3 6 9 7 9-7" /></svg>
@@ -86,6 +89,14 @@
               </div>
               <p class="login-field-error" id="password-error" hidden></p>
               <p class="login-caps-note" id="caps-lock-note" role="status" hidden>Caps Lock is on.</p>
+            </div>
+
+            <div class="login-field" id="confirm-password-field" hidden>
+              <label for="confirm-password">Confirm new password</label>
+              <div class="login-input-wrap">
+                <input id="confirm-password" name="confirm-password" type="password" autocomplete="new-password" placeholder="Enter your new password again" aria-describedby="confirm-password-error" disabled />
+              </div>
+              <p class="login-field-error" id="confirm-password-error" hidden></p>
             </div>
 
             <label class="login-remember" id="remember-field">

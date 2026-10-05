@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#10261f" />
+    <meta name="referrer" content="no-referrer" />
+    <title>My dashboard | Track The Track</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="dashboard.css" />
+    <script src="script.js" defer></script>
+    <script src="vendor/supabase.js" defer></script>
+    <script src="auth.js" defer></script>
+    <script src="dashboard.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="nav-wrap container">
+        <a class="brand" href="index.html" aria-label="Track The Track home">
+          <svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="17" /><circle cx="21" cy="21" r="10" /><path d="M21 4v34" /></svg>
+          <span>Track <em>the</em> Track</span>
+        </a>
+        <button class="button button-small button-dark" id="sign-out" type="button" disabled>Sign out</button>
+      </div>
+    </header>
+    <main class="container account-main">
+      <p id="account-status" role="status" aria-live="polite">Checking your account…</p>
+      <section id="account-content" hidden>
+        <p class="eyebrow"><span></span>Your season</p>
+        <h1 id="welcome">Welcome back.</h1>
+        <p class="account-email">Signed in as <span id="account-email"></span></p>
+        <div class="account-card">
+          <h2>Your race results</h2>
+          <p id="results-status" role="status" aria-live="polite">Loading your results…</p>
+          <div class="results-wrap" id="results-wrap" hidden>
+            <table>
+              <caption class="sr-only">Your saved race results</caption>
+              <thead><tr><th scope="col">Event</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Meet</th></tr></thead>
+              <tbody id="race-results"></tbody>
+            </table>
+          </div>
+          <button class="button button-small button-dark" id="retry-results" type="button" hidden>Try again</button>
+        </div>
+      </section>
+      <noscript>Please enable JavaScript to use your dashboard.</noscript>
+    </main>
+  </body>
+</html>
