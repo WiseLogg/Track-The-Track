@@ -50,12 +50,12 @@ async function setup(handler = () => null, viewport = { width: 1280, height: 800
     const url = new URL(request.url());
     const call = { url, method: request.method(), body: request.postDataJSON() };
     calls.push(call);
-    const response = handler(call) || (url.pathname === '/auth/v1/user'
+    const response = await handler(call) || (url.pathname === '/auth/v1/user'
       ? { status: 200, body: user }
       : url.pathname === '/rest/v1/race_results'
         ? { status: 200, body: [{ event: '400m', race_date: '2026-05-22', time_seconds: 56.7, meet_name: 'Spring meet' }] }
         : { status: 200, body: {} });
-    await route.fulfill({ status: response.status, contentType: 'application/json', headers: { 'x-supabase-api-version': '2024-01-01' }, body: JSON.stringify(response.body) });
+    await route.fulfill({ status: response.status, contentType: 'application/json', headers: { 'x-supabase-api-version': '2024-01-01', ...response.headers }, body: JSON.stringify(response.body) });
   });
   return { context, page, errors, calls };
 }
@@ -333,6 +333,339 @@ test('dashboard handles load errors, mobile layout, and keyboard dialog dismissa
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#result-dialog').isVisible(), false);
     assert.equal(await page.locator('#log-result').evaluate((button) => button === document.activeElement), true);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+function workoutFixture() {
+  const workouts = Array.from({ length: 25 }, (_, i) => ({
+    id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, user_id: i === 0 ? user.id : null,
+    author_name: i === 0 ? 'Logan' : 'Track The Track', title: i === 0 ? 'My hill repeats' : `Running session ${i + 1}`,
+    description: 'A controlled running session with plenty of easy recovery.',
+    category: i % 2 ? 'Speed' : 'Hills', difficulty: i % 3 ? 'Intermediate' : 'Beginner', duration_minutes: 30,
+    steps: 'Warm up easily for 10 minutes.\nRun 4 relaxed repetitions with walking recovery.\nCool down easily for 10 minutes.',
+    created_at: new Date(Date.UTC(2026, 4, 25 - i)).toISOString(), is_builtin: i !== 0,
+  }));
+  const likes = new Set(), saves = new Set(), comments = [];
+  let fail = '';
+  const handler = (call) => {
+    const endpoint = call.url.pathname.replace('/rest/v1/', '');
+    if (endpoint === fail) return { status: 403, body: { message: 'Permission denied', code: '42501' } };
+    if (endpoint === 'rpc/browse_workouts') {
+      const b = call.body;
+      let found = workouts.filter((w) => (!b.category_filter || w.category === b.category_filter)
+        && (!b.difficulty_filter || w.difficulty === b.difficulty_filter)
+        && (!b.search_text || `${w.title} ${w.author_name}`.toLowerCase().includes(b.search_text.toLowerCase()))
+        && (b.collection !== 'saved' || saves.has(w.id)) && (b.collection !== 'mine' || w.user_id === user.id));
+      if (b.sort_order === 'popular') found.sort((a, b) => Number(likes.has(b.id)) - Number(likes.has(a.id)));
+      return { status: 200, body: found.slice(b.page_offset, b.page_offset + b.page_size).map((w) => ({ ...w,
+        liked: likes.has(w.id), saved: saves.has(w.id), like_count: Number(likes.has(w.id)),
+        comment_count: comments.filter((c) => c.workout_id === w.id).length, total_count: found.length,
+      })) };
+    }
+    if (endpoint === 'workout_likes' || endpoint === 'workout_favorites') {
+      const values = endpoint === 'workout_likes' ? likes : saves;
+      if (call.method === 'POST') values.add(call.body.workout_id);
+      if (call.method === 'DELETE') values.delete(call.url.searchParams.get('workout_id').slice(3));
+      return { status: 200, body: null };
+    }
+    if (endpoint === 'workouts' && call.method === 'POST') {
+      workouts.unshift({ ...call.body, id: '10000000-0000-4000-8000-000000000001', created_at: new Date().toISOString(), is_builtin: false });
+      return { status: 201, body: null };
+    }
+    if (endpoint === 'workouts' && call.method === 'DELETE') {
+      const index = workouts.findIndex((w) => w.id === call.url.searchParams.get('id').slice(3));
+      workouts.splice(index, 1);
+      return { status: 200, body: null };
+    }
+    if (endpoint === 'workout_comments') {
+      if (call.method === 'POST') {
+        comments.unshift({ ...call.body, id: `comment-${comments.length + 1}`, created_at: new Date().toISOString() });
+        return { status: 201, body: null };
+      }
+      if (call.method === 'DELETE') {
+        const index = comments.findIndex((c) => c.id === call.url.searchParams.get('id').slice(3));
+        comments.splice(index, 1);
+        return { status: 200, body: null };
+      }
+      const found = comments.filter((c) => c.workout_id === call.url.searchParams.get('workout_id').slice(3));
+      const start = Number(call.url.searchParams.get('offset') || 0), limit = Number(call.url.searchParams.get('limit') || 20);
+      return { status: 200, body: found.slice(start, start + limit), headers: { 'content-range': `${start}-${Math.min(start + limit, found.length) - 1}/${found.length}` } };
+    }
+    return null;
+  };
+  return { workouts, likes, saves, comments, handler, fail: (endpoint) => { fail = endpoint; } };
+}
+
+async function workoutsSetup(handler, viewport) {
+  const result = await setup(handler, viewport);
+  await result.context.addInitScript((stored) => localStorage.setItem('track-the-track.auth', JSON.stringify(stored)), {
+    ...session, expires_at: Math.floor(Date.now() / 1000) + 3600,
+  });
+  await result.page.goto(`${origin}/workouts.html`);
+  await result.page.waitForFunction(() => document.querySelector('#workout-results').getAttribute('aria-busy') === 'false');
+  return result;
+}
+
+const libraryIdle = (page) => page.waitForFunction(() => document.querySelector('#workout-results').getAttribute('aria-busy') === 'false');
+
+async function starterLibrary() {
+  const sql = await fs.readFile(path.join(root, 'supabase/workout-library.sql'), 'utf8');
+  // Match the canonical one-row-per-line SQL data, including escaped apostrophes.
+  const pattern = /^\('((?:''|[^'])*)', 'Track The Track', '((?:''|[^'])*)', '((?:''|[^'])*)', '((?:''|[^'])*)', '((?:''|[^'])*)', (\d+), E'((?:''|[^'])*)'\),?$/gm;
+  return [...sql.matchAll(pattern)].map((row, i) => ({
+    id: `20000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, user_id: null, is_builtin: true,
+    builtin_key: row[1], author_name: 'Track The Track', title: row[2].replaceAll("''", "'"),
+    description: row[3].replaceAll("''", "'"), category: row[4], difficulty: row[5],
+    duration_minutes: Number(row[6]), steps: row[7].replaceAll('\\n', '\n').replaceAll("''", "'"),
+    created_at: '2026-10-07T12:00:00Z',
+  }));
+}
+
+test('starter library contains 50 unique complete self-paced running workouts', async () => {
+  const workouts = await starterLibrary();
+  assert.equal(workouts.length, 50);
+  assert.equal(new Set(workouts.map((w) => w.builtin_key)).size, 50);
+  assert.equal(new Set(workouts.map((w) => w.title)).size, 50);
+  assert.deepEqual(new Set(workouts.map((w) => w.category)), new Set(['Speed', 'Intervals', 'Endurance', 'Hills', 'Recovery', 'Race prep']));
+  assert.deepEqual(new Set(workouts.map((w) => w.difficulty)), new Set(['Beginner', 'Intermediate', 'Advanced']));
+  for (const workout of workouts) {
+    assert.ok(workout.title.length >= 3 && workout.title.length <= 100, workout.title);
+    assert.ok(workout.description.length >= 10 && workout.description.length <= 400, workout.title);
+    assert.ok(workout.duration_minutes >= 5 && workout.duration_minutes <= 180, workout.title);
+    assert.ok(workout.steps.length >= 20 && workout.steps.length <= 6000, workout.title);
+    assert.ok(workout.steps.split('\n').length >= 4, workout.title);
+    assert.match(workout.steps.split('\n').slice(0, 2).join(' '), /warm.?up|begin with|start with|\bwalk(?:ing)?\b|\bjog(?:ging)?\b/i, workout.title);
+    // A race-day warm-up leads into the race, not an immediate cool-down.
+    if (workout.builtin_key === 'warmup-routine') {
+      assert.equal(workout.category, 'Race prep');
+      assert.match(workout.steps, /before the start/i);
+    } else {
+      assert.match(workout.steps, /cool.?down|finish with|to finish|final .*minutes/i, workout.title);
+    }
+    assert.doesNotMatch(`${workout.description} ${workout.steps}`, /coach/i, workout.title);
+  }
+});
+
+test('all 50 starter workouts are reachable across five pages and suit solo training', async () => {
+  const fixture = workoutFixture();
+  fixture.workouts.splice(0, fixture.workouts.length, ...await starterLibrary());
+  const { context, page, errors } = await workoutsSetup(fixture.handler);
+  try {
+    const visited = new Set();
+    assert.equal(await page.locator('#workout-count').textContent(), '50 workouts');
+    assert.match(await page.locator('.workout-banner').textContent(), /50 starter sessions/);
+    assert.match(await page.locator('.training-note').textContent(), /no coach required/i);
+    for (let number = 1; number <= 5; number++) {
+      assert.equal(await page.locator('#page-label').textContent(), `Page ${number} of 5`);
+      assert.equal(await page.locator('.workout-card').count(), number === 5 ? 2 : 12);
+      for (const title of await page.locator('.workout-title-button').allTextContents()) visited.add(title);
+      if (number < 5) { await page.locator('#next-page').click(); await libraryIdle(page); }
+    }
+    assert.equal(visited.size, 50);
+    assert.equal(await page.locator('#next-page').isDisabled(), true);
+    await page.locator('.workout-title-button').last().click();
+    assert.equal(await page.locator('#detail-title').textContent(), 'Controlled distance pacing rehearsal');
+    assert.match(await page.locator('#detail-steps').textContent(), /controlled effort/);
+    assert.equal(await page.locator('#delete-workout').isVisible(), false);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('Workouts is linked from the dashboard and requires sign-in', async () => {
+  const { context, page, errors } = await setup();
+  try {
+    await page.goto(`${origin}/workouts.html`);
+    await page.waitForURL('**/login.html');
+    const dashboard = await page.request.get(`${origin}/dashboard.html`);
+    assert.match(await dashboard.text(), /href="workouts\.html"/);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('workouts search, filters, sorting, collections, and pagination query the server', async () => {
+  const fixture = workoutFixture();
+  const { context, page, calls, errors } = await workoutsSetup(fixture.handler);
+  try {
+    assert.equal(await page.locator('.workout-card').count(), 12);
+    assert.equal(await page.locator('#workout-count').textContent(), '25 workouts');
+    await page.locator('#next-page').click(); await libraryIdle(page);
+    assert.equal(await page.locator('#page-label').textContent(), 'Page 2 of 3');
+    await page.locator('#next-page').click(); await libraryIdle(page);
+    assert.equal(await page.locator('.workout-card').count(), 1);
+    assert.equal(await page.locator('#next-page').isDisabled(), true);
+    await page.locator('#previous-page').click(); await libraryIdle(page);
+    await page.locator('#workout-search').fill('hill');
+    await page.locator('#search-form button').click(); await libraryIdle(page);
+    assert.equal(await page.locator('.workout-card').count(), 1);
+    await page.locator('#category-filter').selectOption('Speed'); await libraryIdle(page);
+    assert.match(await page.locator('#library-status').textContent(), /No workouts match/);
+    await page.locator('#clear-filters').click(); await libraryIdle(page);
+    await page.locator('#difficulty-filter').selectOption('Beginner'); await libraryIdle(page);
+    assert.equal(await page.locator('.workout-card').count(), 9);
+    await page.locator('#sort-order').selectOption('popular'); await libraryIdle(page);
+    const query = calls.filter((c) => c.url.pathname.endsWith('rpc/browse_workouts')).at(-1).body;
+    assert.deepEqual(query, { search_text: '', category_filter: '', difficulty_filter: 'Beginner', collection: 'all', sort_order: 'popular', page_offset: 0, page_size: 12 });
+    await page.locator('#difficulty-filter').selectOption(''); await libraryIdle(page);
+    await page.locator('[data-collection="saved"]').click(); await libraryIdle(page);
+    assert.match(await page.locator('#library-status').textContent(), /favorites/);
+    await page.locator('[data-collection="mine"]').click(); await libraryIdle(page);
+    assert.equal(await page.locator('.workout-card').count(), 1);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('likes and favorites persist across reload and can be removed', async () => {
+  const fixture = workoutFixture();
+  const { context, page, calls, errors } = await workoutsSetup(fixture.handler);
+  try {
+    const first = page.locator('.workout-card').first();
+    await first.locator('[data-action="like"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-action="like"]').getAttribute('aria-pressed') === 'true');
+    await first.locator('[data-action="save"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-action="save"]').getAttribute('aria-pressed') === 'true');
+    await page.reload(); await libraryIdle(page);
+    assert.equal(await first.locator('[data-action="like"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await first.locator('[data-action="save"]').getAttribute('aria-pressed'), 'true');
+    await page.locator('[data-collection="saved"]').click(); await libraryIdle(page);
+    assert.equal(await page.locator('.workout-card').count(), 1);
+    await first.locator('[data-action="save"]').click();
+    await page.waitForFunction(() => document.querySelector('#workout-count').textContent === '0 workouts');
+    assert.equal(fixture.saves.size, 0);
+    await page.locator('[data-collection="all"]').click(); await libraryIdle(page);
+    await first.locator('[data-action="like"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-action="like"]').getAttribute('aria-pressed') === 'false');
+    for (const call of calls.filter((c) => c.method === 'POST' && /workout_(likes|favorites)$/.test(c.url.pathname))) assert.equal(call.body.user_id, user.id);
+    assert.equal(fixture.likes.size, 0);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('workout load and action failures offer retry without showing false success', async () => {
+  const fixture = workoutFixture(); fixture.fail('rpc/browse_workouts');
+  const { context, page, errors } = await workoutsSetup(fixture.handler);
+  try {
+    assert.equal(await page.locator('#retry-workouts').isVisible(), true);
+    fixture.fail(''); await page.locator('#retry-workouts').click(); await libraryIdle(page);
+    fixture.fail('workout_likes');
+    const like = page.locator('.workout-card').first().locator('[data-action="like"]');
+    await like.click();
+    await page.waitForFunction(() => document.querySelector('#workout-feedback').textContent.includes('couldn’t'));
+    assert.equal(await like.getAttribute('aria-pressed'), 'false');
+    assert.equal(await like.isEnabled(), true);
+    fixture.fail(''); await like.click();
+    await page.waitForFunction(() => document.querySelector('[data-action="like"]').getAttribute('aria-pressed') === 'true');
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('athletes can publish a workout; failed publishing preserves their draft', async () => {
+  const fixture = workoutFixture();
+  const { context, page, calls, errors } = await workoutsSetup(fixture.handler);
+  try {
+    await page.locator('#create-workout').click();
+    await page.locator('#workout-title').fill('  My easy interval session  ');
+    await page.locator('#workout-category').selectOption('Intervals');
+    await page.locator('#workout-difficulty').selectOption('Beginner');
+    await page.locator('#workout-duration').fill('30');
+    await page.locator('#workout-description').fill('Easy intervals with generous walking recovery.');
+    await page.locator('#workout-steps').fill('Warm up with easy jogging.\nRun 4 gentle repetitions with full recovery.\nCool down with walking.');
+    fixture.fail('workouts'); await page.locator('#publish-workout').click();
+    await page.locator('#create-error').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#publish-workout').isEnabled(), true);
+    assert.equal(await page.locator('#workout-duration').inputValue(), '30');
+    fixture.fail(''); await page.locator('#publish-workout').click();
+    await page.locator('#create-dialog').waitFor({ state: 'hidden' }); await libraryIdle(page);
+    assert.equal(await page.locator('[data-collection="mine"]').getAttribute('aria-pressed'), 'true');
+    assert.match(await page.locator('#workout-grid').textContent(), /My easy interval session/);
+    const payload = calls.filter((c) => c.url.pathname === '/rest/v1/workouts' && c.method === 'POST').at(-1).body;
+    assert.equal(payload.user_id, user.id); assert.equal(payload.author_name, 'Logan');
+    assert.equal(payload.title, 'My easy interval session'); assert.equal(payload.duration_minutes, 30);
+    await page.reload(); await libraryIdle(page);
+    assert.match(await page.locator('#workout-grid').textContent(), /My easy interval session/);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('comments are paginated, persistent, safe text, and only owners get delete controls', async () => {
+  const fixture = workoutFixture();
+  fixture.comments.push(...Array.from({ length: 23 }, (_, i) => ({ id: `other-${i}`, workout_id: fixture.workouts[0].id, user_id: 'another-athlete',
+    author_name: 'Another athlete', body: `Useful session ${i + 1}`, created_at: '2026-05-01T12:00:00Z' })));
+  const { context, page, calls, errors } = await workoutsSetup(fixture.handler);
+  try {
+    await page.locator('.workout-card').first().locator('[data-action="comments"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('.comment').length === 20);
+    assert.equal(await page.locator('.comment button').count(), 0);
+    await page.locator('#more-comments').click();
+    await page.waitForFunction(() => document.querySelectorAll('.comment').length === 23);
+    fixture.fail('workout_comments');
+    await page.locator('#comment-body').fill('<img src=x onerror="window.hacked=true"> Great workout!');
+    await page.locator('#post-comment').click();
+    await page.waitForFunction(() => document.querySelector('#detail-feedback').textContent.includes('couldn’t'));
+    assert.equal(await page.locator('#post-comment').isEnabled(), true);
+    assert.match(await page.locator('#comment-body').inputValue(), /Great workout/);
+    fixture.fail(''); await page.locator('#post-comment').click();
+    await page.waitForFunction(() => document.querySelector('#detail-feedback').textContent.includes('posted'));
+    await page.waitForFunction(() => document.querySelector('.comment').textContent.includes('Great workout'));
+    assert.equal(await page.locator('.comment img').count(), 0);
+    assert.equal(await page.evaluate(() => window.hacked), undefined);
+    const post = calls.filter((c) => c.url.pathname.endsWith('workout_comments') && c.method === 'POST').at(-1);
+    assert.equal(post.body.user_id, user.id);
+    assert.equal(await page.locator('.comment button').count(), 1);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('.comment button').click();
+    await page.waitForFunction(() => document.querySelector('#detail-feedback').textContent.includes('deleted'));
+    await page.waitForFunction(() => document.querySelector('#comment-count').textContent === '23 total');
+    await page.keyboard.press('Escape');
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('only own workouts can be deleted; starter sessions have no delete control', async () => {
+  const fixture = workoutFixture();
+  const { context, page, calls, errors } = await workoutsSetup(fixture.handler);
+  try {
+    await page.locator('.workout-title-button').nth(1).click();
+    assert.equal(await page.locator('#delete-workout').isVisible(), false);
+    await page.keyboard.press('Escape');
+    await page.locator('.workout-title-button').first().click();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#delete-workout').click();
+    await page.locator('#detail-dialog').waitFor({ state: 'hidden' }); await libraryIdle(page);
+    assert.equal(fixture.workouts.length, 24);
+    const call = calls.find((c) => c.url.pathname === '/rest/v1/workouts' && c.method === 'DELETE');
+    assert.equal(call.url.searchParams.get('user_id'), `eq.${user.id}`);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('workouts and dialogs fit mobile screens and support keyboard dismissal', async () => {
+  const fixture = workoutFixture();
+  const { context, page, errors } = await workoutsSetup(fixture.handler);
+  try {
+    if (process.env.TRACK_DASHBOARD_SCREENSHOTS) {
+      await fs.mkdir('/tmp/track-workouts-validation', { recursive: true });
+      await page.screenshot({ path: '/tmp/track-workouts-validation/desktop.png', fullPage: true });
+    }
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow at ${width}px`);
+      if (width < 900) await page.waitForFunction(() => {
+        const nav = document.querySelector('.dashboard-nav').getBoundingClientRect();
+        const active = document.querySelector('.dashboard-nav [aria-current="page"]').getBoundingClientRect();
+        return active.left >= nav.left && active.right <= nav.right + 1;
+      });
+      await page.locator('.workout-title-button').first().click();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.querySelector('.workout-title-button') === document.activeElement);
+      assert.equal(await page.locator('.workout-title-button').first().evaluate((button) => button === document.activeElement), true);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    if (process.env.TRACK_DASHBOARD_SCREENSHOTS) await page.screenshot({ path: '/tmp/track-workouts-validation/mobile.png', fullPage: true });
+    await page.locator('#create-workout').click(); await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#create-dialog').isVisible(), false);
+    await page.locator('#sign-out').click(); await page.waitForURL('**/login.html');
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });

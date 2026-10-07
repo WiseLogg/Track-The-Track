@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#10261f" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="Find your next running workout. Share sessions, save favorites, and train together." />
+    <title>Workouts | Track The Track</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="dashboard.css" />
+    <link rel="stylesheet" href="workouts.css" />
+    <script src="vendor/supabase.js" defer></script>
+    <script src="auth.js" defer></script>
+    <script src="workouts.js" defer></script>
+  </head>
+  <body class="dashboard-page workouts-page">
+    <a class="skip-link" href="#account-main">Skip to workouts</a>
+    <aside class="dashboard-sidebar">
+      <a class="brand dashboard-brand" href="index.html" aria-label="Track The Track home"><svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="17"/><circle cx="21" cy="21" r="10"/><path d="M21 4v34"/></svg><span>Track <em>the</em> Track</span></a>
+      <p class="sidebar-label">Your workspace</p>
+      <nav class="dashboard-nav" aria-label="Dashboard navigation">
+        <a href="dashboard.html#overview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>
+        <a href="dashboard.html#progress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18M6 15l5-5 4 3 6-8"/></svg>My progress</a>
+        <a href="dashboard.html#results"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Race results</a>
+        <a href="dashboard.html#bests"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="m8 14-1 7 5-3 5 3-1-7"/></svg>Personal bests</a>
+        <a class="is-active" href="workouts.html" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 4-3 6 5 3-2 7M5 13l5-3M15 13h5"/><circle cx="16" cy="4" r="2"/></svg>Workouts</a>
+      </nav>
+      <div class="sidebar-track" aria-hidden="true"><span></span><span></span><span></span><i></i></div>
+      <div class="sidebar-bottom">
+        <div class="athlete-profile"><span class="profile-avatar" id="profile-initials" aria-hidden="true">TT</span><div><strong id="profile-name">My account</strong><span>Athlete</span></div></div>
+        <button id="sign-out" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v16h5M9 12h12m-4-4 4 4-4 4"/></svg>Sign out</button>
+      </div>
+    </aside>
+    <main class="account-main" id="account-main" tabindex="-1">
+      <div class="dashboard-topbar"><span>Workout library</span><a href="dashboard.html">Back to dashboard <span aria-hidden="true">↗</span></a></div>
+      <p id="account-status" class="dashboard-notice" role="status">Checking your account…</p>
+      <section id="account-content" hidden>
+        <header class="dashboard-heading">
+          <div><p class="eyebrow"><span></span>Good sessions. Shared.</p><h1>Find your next <em>stride.</em></h1><p class="dashboard-intro">Explore running workouts, share your go-tos, and build a library of favorites.</p></div>
+          <div class="dashboard-actions"><button class="button button-primary" id="create-workout" type="button"><span aria-hidden="true">+</span>Create workout</button></div>
+        </header>
+        <section class="workout-banner" aria-label="About the library">
+          <div><p class="panel-kicker">A little inspiration for your next session</p><h2>From easy miles to the starting line.</h2><p>Explore 50 starter sessions for speed, endurance, hills, and recovery. Train on your own or find inspiration from the community.</p></div>
+          <div class="banner-lanes" aria-hidden="true"><span></span><span></span><span></span><i></i><b>ON YOUR<br/>MARK.</b></div>
+        </section>
+        <div class="workout-collections" role="group" aria-label="Workout collection">
+          <button type="button" data-collection="all" class="is-active" aria-pressed="true">Explore</button>
+          <button type="button" data-collection="saved" aria-pressed="false"><span aria-hidden="true">☆</span>Saved</button>
+          <button type="button" data-collection="mine" aria-pressed="false">My workouts</button>
+        </div>
+        <form id="search-form" class="workout-toolbar" role="search" aria-label="Find workouts">
+          <div class="workout-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg><label class="sr-only" for="workout-search">Search workouts</label><input id="workout-search" name="search" type="search" maxlength="200" placeholder="Search workouts, athletes, or distances…"/><button type="submit">Search</button></div>
+          <label class="sr-only" for="category-filter">Workout type</label><select id="category-filter"><option value="">All types</option><option>Speed</option><option>Intervals</option><option>Endurance</option><option>Hills</option><option>Recovery</option><option>Race prep</option></select>
+          <label class="sr-only" for="difficulty-filter">Difficulty</label><select id="difficulty-filter"><option value="">All levels</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
+          <label class="sr-only" for="sort-order">Sort workouts</label><select id="sort-order"><option value="newest">Newest first</option><option value="popular">Most liked</option></select>
+        </form>
+        <div class="library-heading"><h2 id="collection-heading">Explore workouts</h2><p id="workout-count" role="status" aria-live="polite"></p></div>
+        <p id="workout-feedback" class="dashboard-notice" role="status" aria-live="polite" hidden></p>
+        <section id="workout-results" aria-labelledby="collection-heading" aria-busy="true">
+          <p id="library-status" class="panel-empty" role="status">Loading workouts…</p>
+          <button id="retry-workouts" class="button button-dark" type="button" hidden>Try again</button>
+          <button id="clear-filters" class="dashboard-text-button" type="button" hidden>Clear search and filters</button>
+          <div id="workout-grid" class="workout-grid"></div>
+        </section>
+        <nav class="workout-pagination" aria-label="Workout pages" hidden id="workout-pagination"><button type="button" id="previous-page">← Previous</button><span id="page-label"></span><button type="button" id="next-page">Next →</button></nav>
+        <aside class="training-note"><span aria-hidden="true">ⓘ</span><p>Train solo or with others—no coach required. These are session ideas, not a personalized training plan. Adjust pace, reps, and recovery to your experience and how you feel. Warm up, build gradually, take rest days, and stop if you feel pain or unwell. For getting started, see the <a href="https://www.nhs.uk/better-health/get-active/get-running-with-couch-to-5k/" target="_blank" rel="noopener noreferrer">NHS running guide ↗</a>.</p></aside>
+        <footer class="dashboard-footer"><p>Track The Track <span aria-hidden="true">·</span> Make every effort count.</p><p class="account-email">Signed in as <span id="account-email"></span></p></footer>
+      </section>
+      <noscript>Please enable JavaScript to browse and save workouts.</noscript>
+    </main>
+
+    <dialog id="create-dialog" class="result-dialog workout-create-dialog" aria-labelledby="create-heading">
+      <div class="dialog-heading"><div><p class="panel-kicker">Share what moves you</p><h2 id="create-heading">Create a workout</h2></div><button class="close-dialog" type="button" data-close="create-dialog" aria-label="Close workout form">×</button></div>
+      <p class="dialog-intro">Your workout and display name will be visible to all signed-in athletes. Don’t include private information.</p>
+      <form id="create-form">
+        <div class="result-field"><label for="workout-title">Workout name</label><input id="workout-title" name="title" minlength="3" maxlength="100" required placeholder="e.g. My favorite 200m session"/></div>
+        <div class="form-grid">
+          <div class="result-field"><label for="workout-category">Type</label><select id="workout-category" name="category" required><option>Speed</option><option>Intervals</option><option>Endurance</option><option>Hills</option><option>Recovery</option><option>Race prep</option></select></div>
+          <div class="result-field"><label for="workout-difficulty">Difficulty</label><select id="workout-difficulty" name="difficulty" required><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div>
+        </div>
+        <div class="result-field"><label for="workout-duration">Approximate total time (minutes)</label><input id="workout-duration" name="duration" type="number" min="5" max="180" step="1" required placeholder="30"/></div>
+        <div class="result-field"><label for="workout-description">Short description</label><textarea id="workout-description" name="description" rows="2" minlength="10" maxlength="400" required placeholder="What’s the focus of this session?"></textarea></div>
+        <div class="result-field"><label for="workout-steps">Session plan</label><textarea id="workout-steps" name="steps" rows="6" minlength="20" maxlength="6000" aria-describedby="steps-hint" required placeholder="Warm-up&#10;Main set: distance, reps, effort, and rest&#10;Cool-down"></textarea><p id="steps-hint">Include a warm-up, recovery between efforts, and a cool-down. Put each step on a new line.</p></div>
+        <p id="create-error" class="save-error" role="alert" hidden></p>
+        <div class="dialog-actions"><button class="button button-dark" type="button" data-close="create-dialog">Cancel</button><button class="button button-primary" id="publish-workout" type="submit">Publish workout ↗</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="detail-dialog" class="result-dialog workout-detail-dialog" aria-labelledby="detail-title">
+      <div class="dialog-heading"><p class="panel-kicker" id="detail-category"></p><button class="close-dialog" type="button" data-close="detail-dialog" aria-label="Close workout details">×</button></div>
+      <h2 id="detail-title"></h2><p id="detail-author" class="workout-byline"></p><div id="detail-meta" class="workout-meta"></div>
+      <p id="detail-description"></p><h3 class="session-heading">The session</h3><ol id="detail-steps" class="session-steps"></ol>
+      <div class="detail-actions" id="detail-actions"></div>
+      <p id="detail-feedback" class="save-error" role="status" aria-live="polite" hidden></p>
+      <section class="workout-discussion" aria-labelledby="comments-heading"><div class="library-heading"><h3 id="comments-heading">Comments</h3><span id="comment-count"></span></div>
+        <p class="comment-guidance">Share your experience. Be kind, and keep personal information private.</p>
+        <form id="comment-form"><label class="sr-only" for="comment-body">Write a comment</label><textarea id="comment-body" name="comment" rows="3" maxlength="1000" required placeholder="How did this session go?"></textarea><button type="submit" id="post-comment" class="button button-primary">Post comment</button></form>
+        <p id="comments-status" role="status" aria-live="polite"></p><button type="button" id="retry-comments" class="dashboard-text-button" hidden>Retry comments</button><div id="comment-list"></div><button type="button" id="more-comments" class="dashboard-text-button" hidden>Load more comments</button>
+      </section>
+      <button id="delete-workout" type="button" class="delete-workout" hidden>Delete my workout</button>
+    </dialog>
+  </body>
+</html>
