@@ -6,7 +6,7 @@ A GitHub Pages website connected to the existing Track-The-Track Supabase projec
 
 - `signup.html`: creates an email/password account and stores the athlete's name as display metadata.
 - `login.html`: signs in, requests password reset links, and accepts a new password from a recovery link.
-- `dashboard.html`: validates the session with Supabase, displays the account's saved race results, and signs out.
+- `dashboard.html`: validates the session with Supabase and shows season totals, event progress charts, all-time personal bests, and a filterable results table. Athletes can log race times in seconds or minutes:seconds; results save to their own account. Includes sign-out and responsive layouts.
 - `auth.js`: shared client configuration using the public publishable key. Never add secret or service-role keys to this repository.
 - `supabase/setup.sql`: ownership policies applied to the existing `race_results` table. RLS, rather than the static page redirect, protects user data. Display metadata is never used for authorization.
 

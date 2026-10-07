@@ -189,3 +189,150 @@ test('mobile account pages fit the viewport and missing SDK fails clearly', asyn
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
+
+async function dashboardSetup(handler, viewport) {
+  const result = await setup(handler, viewport);
+  await result.context.addInitScript((stored) => {
+    localStorage.setItem('track-the-track.auth', JSON.stringify(stored));
+  }, { ...session, expires_at: Math.floor(Date.now() / 1000) + 3600 });
+  await result.page.goto(`${origin}/dashboard.html`);
+  await result.page.waitForFunction(() => document.querySelector('#season-summary').getAttribute('aria-busy') === 'false');
+  return result;
+}
+
+const seasonResults = [
+  { event: '100m', race_date: '2025-05-01', time_seconds: 12.5, meet_name: 'Last season' },
+  { event: '100m', race_date: '2026-03-01', time_seconds: 12.2, meet_name: 'Season opener' },
+  { event: '200m', race_date: '2026-03-01', time_seconds: 24.8, meet_name: 'Season opener' },
+  { event: '100m', race_date: '2026-03-20', time_seconds: 12, meet_name: 'City Invitational' },
+  { event: '100m', race_date: '2026-04-10', time_seconds: 12.15, meet_name: 'League meet' },
+  { event: '200m', race_date: '2026-04-10', time_seconds: 24.4, meet_name: 'League meet' },
+  { event: '800m', race_date: '2026-04-10', time_seconds: 125.12, meet_name: 'League meet' },
+  { event: '100m', race_date: '2026-05-01', time_seconds: 11.84, meet_name: 'Championships' },
+];
+
+test('dashboard calculates season stats, personal records, and filtered charts', async () => {
+  const { context, page, errors } = await dashboardSetup((call) => call.url.pathname === '/rest/v1/race_results'
+    ? { status: 200, body: seasonResults } : null);
+  try {
+    assert.equal(await page.locator('#season-filter').inputValue(), '2026');
+    for (const [selector, value] of Object.entries({ '#stat-meets': '4', '#stat-results': '7', '#stat-prs': '4', '#stat-events': '3' })) {
+      assert.equal(await page.locator(selector).textContent(), value);
+    }
+    assert.equal(await page.locator('#race-results .pr-tag').count(), 4);
+    assert.match(await page.locator('#personal-bests').textContent(), /11.84s/);
+    assert.match(await page.locator('#personal-bests').textContent(), /2:05.12/);
+    await page.locator('#chart-event').selectOption('200m');
+    assert.equal(await page.locator('#chart-best').textContent(), '24.4s');
+    assert.equal(await page.locator('#performance-chart circle').count(), 2);
+    assert.match(await page.locator('#chart-improvement').textContent(), /1.6%/);
+    await page.locator('#results-event').selectOption('800m');
+    assert.equal(await page.locator('#race-results tr').count(), 1);
+    assert.match(await page.locator('#race-results').textContent(), /2:05.12/);
+    await page.locator('#season-filter').selectOption('2025');
+    assert.equal(await page.locator('#stat-results').textContent(), '1');
+    assert.equal(await page.locator('#stat-prs').textContent(), '0');
+    assert.equal(await page.locator('#chart-best').textContent(), '12.5s');
+    await page.locator('#season-filter').selectOption('all');
+    assert.equal(await page.locator('#race-results tr').count(), 8);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    if (process.env.TRACK_DASHBOARD_SCREENSHOTS) {
+      await fs.mkdir('/tmp/track-dashboard-validation', { recursive: true });
+      await page.locator('#season-filter').selectOption('2026');
+      await page.screenshot({ path: '/tmp/track-dashboard-validation/desktop.png', fullPage: true });
+    }
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('dashboard validates times, saves to the current account, and survives reload', async () => {
+  const saved = [];
+  const { context, page, errors, calls } = await dashboardSetup((call) => {
+    if (call.url.pathname !== '/rest/v1/race_results') return null;
+    if (call.method === 'POST') {
+      saved.push(call.body);
+      return { status: 201, body: call.body };
+    }
+    return { status: 200, body: saved };
+  });
+  try {
+    assert.equal(await page.locator('#stat-results').textContent(), '0');
+    assert.match(await page.locator('#results-status').textContent(), /first race/);
+    await page.locator('#log-result').click();
+    await page.locator('#result-event').selectOption('1600m');
+    await page.locator('#result-date').fill('2026-05-15');
+    await page.locator('#result-meet').fill('  District Meet  ');
+    await page.locator('#result-time').fill('5:75');
+    await page.locator('#save-result').click();
+    assert.equal(await page.locator('#result-time').evaluate((input) => input.validity.valid), false);
+    assert.equal(calls.filter((call) => call.method === 'POST').length, 0);
+    await page.locator('#result-time').fill('5:12.34');
+    await page.locator('#save-result').click();
+    await page.locator('#result-dialog').waitFor({ state: 'hidden' });
+    assert.equal(saved.length, 1);
+    assert.deepEqual(saved[0], { user_id: user.id, event: '1600m', race_date: '2026-05-15', time_seconds: 312.34, meet_name: 'District Meet' });
+    assert.equal(await page.locator('#stat-results').textContent(), '1');
+    assert.equal(await page.locator('#chart-best').textContent(), '5:12.34');
+    assert.equal(await page.locator('#chart-event').inputValue(), '1600m');
+    await page.reload();
+    await page.locator('#results-wrap').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#race-results').textContent(), /District Meet/);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('result errors preserve form input and allow a successful retry', async () => {
+  let fail = true;
+  const { context, page, errors, calls } = await dashboardSetup((call) => {
+    if (call.url.pathname !== '/rest/v1/race_results') return null;
+    if (call.method === 'POST') return fail
+      ? { status: 403, body: { message: 'Permission denied', code: '42501' } }
+      : { status: 201, body: call.body };
+    return { status: 200, body: [] };
+  });
+  try {
+    await page.locator('#log-result').click();
+    await page.locator('#result-date').fill('2026-05-15');
+    await page.locator('#result-meet').fill('City Invitational');
+    await page.locator('#result-time').fill('11.84');
+    await page.locator('#save-result').click();
+    await page.locator('#save-error').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#result-time').inputValue(), '11.84');
+    assert.equal(await page.locator('#save-result').isEnabled(), true);
+    assert.equal(await page.locator('#stat-results').textContent(), '0');
+    fail = false;
+    await page.locator('#save-result').click();
+    await page.locator('#result-dialog').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('#stat-results').textContent(), '1');
+    assert.equal(calls.filter((call) => call.method === 'POST').length, 2);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('dashboard handles load errors, mobile layout, and keyboard dialog dismissal', async () => {
+  let fail = true;
+  const { context, page, errors } = await dashboardSetup((call) => call.url.pathname === '/rest/v1/race_results'
+    ? fail ? { status: 403, body: { message: 'Permission denied', code: '42501' } } : { status: 200, body: seasonResults }
+    : null, { width: 390, height: 844 });
+  try {
+    assert.equal(await page.locator('#retry-results').isVisible(), true);
+    assert.equal(await page.locator('#log-result').isDisabled(), true);
+    fail = false;
+    await page.locator('#retry-results').click();
+    await page.locator('#results-wrap').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#retry-results').isVisible(), false);
+    for (const width of [320, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow at ${width}px`);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    if (process.env.TRACK_DASHBOARD_SCREENSHOTS) await page.screenshot({ path: '/tmp/track-dashboard-validation/mobile.png', fullPage: true });
+    await page.locator('#log-result').click();
+    assert.equal(await page.locator('#result-dialog').isVisible(), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#result-dialog').isVisible(), false);
+    assert.equal(await page.locator('#log-result').evaluate((button) => button === document.activeElement), true);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
