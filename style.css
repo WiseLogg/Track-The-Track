@@ -596,6 +596,14 @@ svg {
   font-size: 0.67rem;
 }
 
+.marquee-wrap {
+  overflow: hidden;
+  padding-block: 25px;
+  margin-block: -25px;
+  position: relative;
+  z-index: 1;
+}
+
 .marquee {
   overflow: hidden;
   color: #fff;

@@ -28,3 +28,15 @@ document.addEventListener("keydown", (event) => {
 const year = document.querySelector("#current-year");
 
 if (year) year.textContent = String(new Date().getFullYear());
+
+function revealActiveWorkspaceLink() {
+  const navigation = document.querySelector('.dashboard-nav');
+  const active = navigation?.querySelector('[aria-current]');
+  if (!active || navigation.scrollWidth <= navigation.clientWidth) return;
+  const bounds = navigation.getBoundingClientRect();
+  const link = active.getBoundingClientRect();
+  if (link.right > bounds.right) navigation.scrollLeft += link.right - bounds.right + 1;
+  else if (link.left < bounds.left) navigation.scrollLeft -= bounds.left - link.left + 1;
+}
+window.addEventListener('resize', revealActiveWorkspaceLink);
+requestAnimationFrame(revealActiveWorkspaceLink);

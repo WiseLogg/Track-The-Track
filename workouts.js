@@ -4,7 +4,6 @@
   const pageSize = 12;
   const commentPageSize = 20;
   const commentFields = 'id,workout_id,user_id,author_name,body,created_at';
-  const dashboardNav = $('.dashboard-nav');
   const createDialog = $('#create-dialog');
   const detailDialog = $('#detail-dialog');
   const locks = new Set();
@@ -13,12 +12,6 @@
   let collection = 'all', offset = 0, total = 0;
   let libraryRequest = 0, commentsRequest = 0;
   let commentTotal = 0, publishing = false, posting = false, deleting = false, redirecting = false;
-
-  function revealWorkoutsTab() {
-    if (dashboardNav.scrollWidth > dashboardNav.clientWidth) dashboardNav.scrollLeft = dashboardNav.scrollWidth;
-  }
-  window.addEventListener('resize', revealWorkoutsTab);
-  revealWorkoutsTab();
 
   function element(tag, text, className) {
     const node = document.createElement(tag);
