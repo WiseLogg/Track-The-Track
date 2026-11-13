@@ -209,6 +209,7 @@
     renderBests(bests);
     renderChart();
     renderResults(records);
+    $('#export-results').disabled = !races.length;
   }
 
   async function loadResults() {
@@ -367,6 +368,7 @@
     }
   }
 
+  $('#export-results').addEventListener('click', () => window.TrackExport.results(races));
   season.addEventListener('change', render);
   chartEvent.addEventListener('change', renderChart);
   let resizeFrame;

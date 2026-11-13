@@ -706,8 +706,22 @@ test('race edits and deletes are scoped, recalculate bests, and preserve data on
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: /^Delete 100m/ }).click();
     await page.waitForFunction(() => document.querySelector('#stat-results').textContent === '0');
+    assert.equal(await page.locator('#export-results').isDisabled(), true);
     const remove = calls.filter((call) => call.method === 'DELETE').at(-1);
     assert.equal(remove.url.searchParams.get('user_id'), `eq.${user.id}`);
     assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('CSV downloads include private notes and neutralize spreadsheet formulas', async () => {
+  const { context, page } = await dashboardSetup((call) => call.url.pathname.endsWith('/race_results') ? { status: 200, body: [{ event: '100m', race_date: '2026-01-01', time_seconds: 12, meet_name: '=HYPERLINK("evil")', notes: '+formula' }] } : null);
+  try {
+    const downloaded = page.waitForEvent('download');
+    await page.locator('#export-results').click();
+    const download = await downloaded;
+    const csv = await fs.readFile(await download.path(), 'utf8');
+    assert.match(csv, /time_seconds/);
+    assert.match(csv, /'=HYPERLINK/);
+    assert.match(csv, /'\+formula/);
   } finally { await context.close(); }
 });
