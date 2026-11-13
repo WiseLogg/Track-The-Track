@@ -12,6 +12,7 @@
   const form = $('#result-form');
   const timeInput = $('#result-time');
   const fields = 'id,event,race_date,time_seconds,meet_name,notes';
+  const isDemo = Boolean(auth?.isDemo);
   let editingId = null;
   let user;
   let races = [];
@@ -171,7 +172,7 @@
     $('#results-status').hidden = !!selected.length;
     $('#results-status').textContent = races.length ? 'No results for this season and event. Try another filter or log a result.' : 'Your season starts here. Log your first race result to see your progress.';
     $('#results-count').textContent = selected.length;
-    $('#results-summary').textContent = `${selected.length} ${selected.length === 1 ? 'result' : 'results'} · Saved to your account`;
+    $('#results-summary').textContent = `${selected.length} ${selected.length === 1 ? 'result' : 'results'} · ${isDemo ? 'Demo data · Changes aren’t saved' : 'Saved to your account'}`;
     selected.forEach((race) => {
       const row = element('tr');
       [race.event || '—', race.meet_name || '—', dateLabel(race.race_date), validTime(race) ? formatTime(race.time_seconds) : '—'].forEach((value) => row.append(element('td', value)));
@@ -309,7 +310,8 @@
     $('#save-result').textContent = 'Saving…';
     try {
       // RLS checks ownership on insert; the account ID never comes from the form.
-      const response = resultId
+      const response = isDemo ? { data: { ...race, id: resultId || `demo-${crypto.randomUUID()}` }, error: null }
+        : resultId
           ? await auth.client.from('race_results').update(race).eq('id', resultId).eq('user_id', accountId).select(fields).single()
           : await auth.client.from('race_results').insert(race).select(fields).single();
       const { data, error } = response;
@@ -324,7 +326,7 @@
       chartEvent.value = race.event;
       renderChart();
       dialog.close();
-      $('#dashboard-feedback').textContent = `${race.event} result ${resultId ? 'updated' : 'saved'}. Your season is up to date.`;
+      $('#dashboard-feedback').textContent = `${race.event} result ${resultId ? 'updated' : 'saved'}. ${isDemo ? 'Demo changes stay on this page.' : 'Your season is up to date.'}`;
       $('#dashboard-feedback').hidden = false;
     } catch (error) {
       if (!user || user.id !== accountId) return;
@@ -345,8 +347,10 @@
     document.querySelectorAll('#race-results button').forEach((button) => { button.disabled = true; });
     $('#log-result').disabled = $('#log-another').disabled = signOut.disabled = true;
     try {
-      const { error } = await auth.client.from('race_results').delete().eq('id', race.id).eq('user_id', accountId).select('id').single();
-      if (error) throw error;
+      if (!isDemo) {
+        const { error } = await auth.client.from('race_results').delete().eq('id', race.id).eq('user_id', accountId).select('id').single();
+        if (error) throw error;
+      }
       if (!user || user.id !== accountId) return;
       races = races.filter((item) => item.id !== race.id);
       updateSeasons();
@@ -368,7 +372,17 @@
     }
   }
 
-  $('#export-results').addEventListener('click', () => window.TrackExport.results(races));
+  $('#export-results').addEventListener('click', () => window.TrackExport.results(races, isDemo ? 'sample-race-results.csv' : undefined));
+  $('#reset-demo').addEventListener('click', () => {
+    races = window.TrackDemo.results();
+    loaded = false;
+    updateSeasons();
+    loaded = true;
+    render();
+    $('#dashboard-feedback').textContent = 'Sample results reset.';
+    $('#dashboard-feedback').hidden = false;
+  });
+
   season.addEventListener('change', render);
   chartEvent.addEventListener('change', renderChart);
   let resizeFrame;
@@ -384,6 +398,7 @@
   }));
   signOut.addEventListener('click', async () => {
     if (saving) return;
+    if (isDemo) { window.location.href = 'index.html'; return; }
     signOut.disabled = true;
     try {
       const { error } = await auth.client.auth.signOut({ scope: 'local' });
@@ -398,6 +413,26 @@
   retry.addEventListener('click', loadResults);
 
   async function initialize() {
+    if (isDemo) {
+      user = window.TrackDemo.user;
+      races = window.TrackDemo.results();
+      $('#welcome').textContent = 'Welcome to your sample season.';
+      $('#profile-name').textContent = 'Alex · Demo athlete';
+      $('#profile-initials').textContent = 'AX';
+      $('#demo-banner').hidden = false;
+      $('#results-summary').textContent = 'Fictional sample results';
+      document.querySelectorAll('.dashboard-nav a[href="workouts.html"], .dashboard-nav a[href="settings.html"]').forEach((link) => { link.hidden = true; });
+      $('.account-email').textContent = 'Demo mode · No account needed';
+      signOut.textContent = 'Exit demo';
+      signOut.disabled = false;
+      status.hidden = true;
+      content.hidden = false;
+      updateSeasons();
+      loaded = true;
+      render();
+      $('#log-result').disabled = $('#log-another').disabled = false;
+      return;
+    }
     if (!auth?.client) {
       status.textContent = auth?.unavailableMessage || 'Your account couldn’t load. Refresh the page and try again.';
       return;

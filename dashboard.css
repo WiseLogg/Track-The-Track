@@ -120,6 +120,8 @@
 .result-field textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid #c9d0c7; border-radius: 8px; font: inherit; }
 .results-panel td:last-child .dashboard-text-button { display: block; }
 .delete-result { color: #993b24; }
+#demo-banner a { text-decoration: underline; text-underline-offset: 3px; }
+#demo-banner button { margin-inline: 8px; }
 @media (max-width: 1200px) {
   .dashboard-sidebar { width: 218px; padding-inline: 17px; }
   .dashboard-brand { font-size: .875rem; }

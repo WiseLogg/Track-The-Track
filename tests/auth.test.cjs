@@ -713,6 +713,45 @@ test('race edits and deletes are scoped, recalculate bests, and preserve data on
   } finally { await context.close(); }
 });
 
+test('demo supports exploration and CRUD without touching Supabase or an existing session', async () => {
+  const { context, page, calls, errors } = await setup();
+  try {
+    await context.addInitScript(() => localStorage.setItem('track-the-track.auth', 'existing-session-must-stay'));
+    await page.goto(`${origin}/dashboard.html?demo=1`);
+    await page.locator('#demo-banner').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#stat-results').textContent(), '7');
+    await page.locator('#race-results tr').first().getByRole('button', { name: /^Edit / }).click();
+    const sampleDate = await page.locator('#result-date').inputValue();
+    await page.locator('#result-time').fill('10.9');
+    await page.locator('#save-result').click();
+    await page.locator('#result-dialog').waitFor({ state: 'hidden' });
+    assert.match(await page.locator('#personal-bests').textContent(), /10.9s/);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#race-results tr').first().getByRole('button', { name: /^Delete / }).click();
+    await page.waitForFunction(() => document.querySelector('#stat-results').textContent === '6');
+    await page.locator('#log-result').click();
+    await page.locator('#result-date').fill(sampleDate);
+    await page.locator('#result-meet').fill('Demo meet');
+    await page.locator('#result-time').fill('11.5');
+    await page.locator('#save-result').click();
+    await page.locator('#result-dialog').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('#stat-results').textContent(), '7');
+    await page.locator('#reset-demo').click();
+    assert.doesNotMatch(await page.locator('#race-results').textContent(), /Demo meet/);
+    assert.equal(await page.evaluate(() => localStorage.getItem('track-the-track.auth')), 'existing-session-must-stay');
+    assert.equal(calls.length, 0);
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `demo overflow at ${width}`);
+    }
+    if (process.env.TRACK_DASHBOARD_SCREENSHOTS) {
+      await fs.mkdir('/tmp/track-release-validation', { recursive: true });
+      await page.screenshot({ path: '/tmp/track-release-validation/demo.png', fullPage: true });
+    }
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
 test('CSV downloads include private notes and neutralize spreadsheet formulas', async () => {
   const { context, page } = await dashboardSetup((call) => call.url.pathname.endsWith('/race_results') ? { status: 200, body: [{ event: '100m', race_date: '2026-01-01', time_seconds: 12, meet_name: '=HYPERLINK("evil")', notes: '+formula' }] } : null);
   try {

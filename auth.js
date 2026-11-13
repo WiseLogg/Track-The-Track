@@ -1,6 +1,7 @@
 /* Public browser configuration. Never put a secret or service-role key here. */
 (() => {
-  const client = window.supabase?.createClient(
+  const isDemo = window.location.pathname.endsWith('/dashboard.html') && new URLSearchParams(window.location.search).get('demo') === '1';
+  const client = !isDemo && window.supabase?.createClient(
     "https://virlqetwxpgkienkpjdr.supabase.co",
     "sb_publishable_u58SE9eR4dglronJsmLb5A_zKA2KerQ",
     {
@@ -27,6 +28,7 @@
   }
 
   window.TrackAuth = {
+    isDemo,
     client,
     errorMessage,
     pageUrl: (page) => new URL(page, window.location.href).href,

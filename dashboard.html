@@ -12,6 +12,7 @@
     <script src="script.js" defer></script>
     <script src="vendor/supabase.js" defer></script>
     <script src="auth.js" defer></script>
+    <script src="demo-data.js" defer></script>
     <script src="data-export.js" defer></script>
     <script src="dashboard.js" defer></script>
   </head>
@@ -40,6 +41,7 @@
       <div class="dashboard-topbar"><span>My dashboard</span><a href="index.html">Back to home <span aria-hidden="true">↗</span></a></div>
       <p id="account-status" class="dashboard-notice" role="status" aria-live="polite">Checking your account…</p>
       <section id="account-content" hidden>
+        <aside id="demo-banner" class="dashboard-notice" hidden><strong>You’re trying the demo.</strong> These are fictional results. Changes last only until you reload this page. <button type="button" id="reset-demo" class="dashboard-text-button">Reset sample results</button> <a href="signup.html">Create your account ↗</a></aside>
         <header class="dashboard-heading" id="overview">
           <div><p class="eyebrow"><span></span>Own your season</p><h1 id="welcome">Welcome back.</h1><p class="dashboard-intro">Every meet. Every mark. All of your progress, right here.</p></div>
           <div class="dashboard-actions">
