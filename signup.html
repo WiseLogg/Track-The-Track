@@ -12,6 +12,7 @@
     <script src="vendor/supabase.js" defer></script>
     <script src="auth.js" defer></script>
     <script src="signup.js" defer></script>
+    <script src="confirmation.js" defer></script>
   </head>
   <body class="login-page signup-page">
     <main class="login-layout">
@@ -68,7 +69,7 @@
               <label for="name">Your name</label>
               <div class="login-input-wrap">
                 <svg class="login-input-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></svg>
-                <input id="name" name="name" type="text" autocomplete="name" placeholder="Your name" aria-describedby="name-error" required />
+                <input id="name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="Your name" aria-describedby="name-error" required />
               </div>
               <p class="login-field-error" id="name-error" hidden></p>
             </div>
@@ -121,6 +122,7 @@
           </form>
 
           <p class="login-new">Already have an account? <a href="login.html">Log in <span aria-hidden="true">&nearr;</span></a></p>
+          <p class="login-new" id="confirmation-help">Waiting for your signup email? <button class="login-text-button" id="resend-confirmation" type="button" disabled>Resend confirmation</button></p>
           <p class="login-new"><a href="dashboard.html?demo=1">Try the demo without an account ↗</a></p>
           <div class="login-form-note"><span class="login-note-line"></span><span>Your effort. Your progress. Your story.</span><span class="login-note-line"></span></div>
         </div>

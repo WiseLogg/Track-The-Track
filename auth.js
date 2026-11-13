@@ -1,6 +1,14 @@
 /* Public browser configuration. Never put a secret or service-role key here. */
 (() => {
   const isDemo = window.location.pathname.endsWith('/dashboard.html') && new URLSearchParams(window.location.search).get('demo') === '1';
+  // A confirmation link can be opened in a tab already displaying login.html.
+  // Fragment-only navigation does not otherwise reinitialize the auth SDK.
+  if (window.location.pathname.endsWith('/login.html')) {
+    window.addEventListener('hashchange', () => {
+      const callback = new URLSearchParams(window.location.hash.slice(1));
+      if (callback.has('access_token') || callback.has('error') || callback.has('error_description')) window.location.reload();
+    });
+  }
   const client = !isDemo && window.supabase?.createClient(
     "https://virlqetwxpgkienkpjdr.supabase.co",
     "sb_publishable_u58SE9eR4dglronJsmLb5A_zKA2KerQ",

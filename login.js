@@ -80,6 +80,7 @@ function setMode(nextMode) {
     ? 'Choose a new password to get back to your season.'
     : reset ? 'Enter your email and we’ll send a password reset link.' : 'Ready for your next mark? Log in to your account.';
   document.querySelector('#email-field').hidden = update;
+  document.querySelector('#confirmation-help').hidden = mode !== 'login';
   emailInput.disabled = update;
   emailInput.required = !update;
   emailInput.autocomplete = reset ? 'email' : 'username';

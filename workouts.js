@@ -466,7 +466,11 @@
     try {
       const { data, error } = await auth.client.auth.getUser();
       if (redirecting) return;
-      if (error || !data.user) { signedOut(); return; }
+      if (error) {
+        if (error.name === 'AuthSessionMissingError' || [401, 403].includes(error.status)) { signedOut(); return; }
+        throw error;
+      }
+      if (!data.user) { signedOut(); return; }
       user = data.user;
       // Display metadata only; database ownership is always checked with auth.uid().
       const name = user.user_metadata?.display_name;

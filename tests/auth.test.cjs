@@ -764,3 +764,41 @@ test('CSV downloads include private notes and neutralize spreadsheet formulas', 
     assert.match(csv, /'\+formula/);
   } finally { await context.close(); }
 });
+
+test('confirmation resend uses the signup callback, handles failure, and enforces a cooldown', async () => {
+  let fail = true;
+  const { context, page, calls, errors } = await setup((call) => call.url.pathname.endsWith('/resend') ? fail ? { status: 400, body: { message: 'Email service unavailable' } } : { status: 200, body: {} } : null);
+  try {
+    await page.goto(`${origin}/login.html`);
+    await page.locator('#email').fill(user.email);
+    await page.locator('#resend-confirmation').click();
+    await page.waitForFunction(() => document.querySelector('#login-notice').textContent.includes('unavailable'));
+    assert.equal(await page.locator('#resend-confirmation').isEnabled(), true);
+    fail = false;
+    await page.locator('#resend-confirmation').click();
+    await page.waitForFunction(() => document.querySelector('#login-notice').textContent.includes('waiting for confirmation'));
+    assert.equal(await page.locator('#resend-confirmation').isDisabled(), true);
+    const resend = calls.filter((call) => call.url.pathname.endsWith('/resend')).at(-1);
+    assert.equal(resend.body.type, 'signup');
+    assert.equal(resend.body.email, user.email);
+    assert.equal(resend.url.searchParams.get('redirect_to'), `${origin}/login.html`);
+    await page.goto(`${origin}/signup.html`);
+    assert.equal(await page.locator('#resend-confirmation').isVisible(), true);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('signup confirmation callbacks establish a session and expired links show a useful message', async () => {
+  const { context, page, errors } = await setup();
+  try {
+    await page.goto(`${origin}/login.html#error=access_denied&error_description=This%20link%20has%20expired`);
+    await page.waitForFunction(() => document.querySelector('#login-notice').textContent.includes('expired'));
+    assert.equal(new URL(page.url()).hash, '');
+    assert.equal(await page.locator('#resend-confirmation').isVisible(), true);
+    const hash = new URLSearchParams({ access_token: token, refresh_token: session.refresh_token, expires_in: '3600', token_type: 'bearer', type: 'signup' });
+    await page.goto(`${origin}/login.html#${hash}`);
+    await page.waitForURL('**/dashboard.html');
+    await page.locator('#account-content').waitFor({ state: 'visible' });
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
