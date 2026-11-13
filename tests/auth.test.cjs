@@ -669,3 +669,45 @@ test('workouts and dialogs fit mobile screens and support keyboard dismissal', a
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
+
+test('race edits and deletes are scoped, recalculate bests, and preserve data on failure', async () => {
+  let rows = [{ id: 'race-1', event: '100m', race_date: '2026-05-01', time_seconds: 12, meet_name: 'Original meet', notes: 'Private' }];
+  let fail = false;
+  const { context, page, calls, errors } = await dashboardSetup((call) => {
+    if (!call.url.pathname.endsWith('/race_results')) return null;
+    if (call.method === 'GET') return { status: 200, body: rows };
+    if (fail) return { status: 403, body: { message: 'Permission denied', code: '42501' } };
+    if (call.method === 'PATCH') { rows[0] = { ...rows[0], ...call.body }; return { status: 200, body: rows[0] }; }
+    if (call.method === 'DELETE') { rows = []; return { status: 200, body: { id: 'race-1' } }; }
+  });
+  try {
+    await page.getByRole('button', { name: /^Edit 100m/ }).click();
+    assert.equal(await page.locator('#result-notes').inputValue(), 'Private');
+    await page.locator('#result-time').fill('11.84');
+    fail = true;
+    await page.locator('#save-result').click();
+    await page.locator('#save-error').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#result-time').inputValue(), '11.84');
+    assert.match(await page.locator('#personal-bests').textContent(), /12s/);
+    fail = false;
+    await page.locator('#save-result').click();
+    await page.locator('#result-dialog').waitFor({ state: 'hidden' });
+    assert.match(await page.locator('#personal-bests').textContent(), /11.84s/);
+    const update = calls.filter((call) => call.method === 'PATCH').at(-1);
+    assert.equal(update.url.searchParams.get('id'), 'eq.race-1');
+    assert.equal(update.url.searchParams.get('user_id'), `eq.${user.id}`);
+    await page.reload(); await page.locator('#results-wrap').waitFor({ state: 'visible' });
+    fail = true;
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: /^Delete 100m/ }).click();
+    await page.waitForFunction(() => document.querySelector('#dashboard-feedback').textContent.includes('couldn’t be deleted'));
+    assert.equal(rows.length, 1);
+    fail = false;
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: /^Delete 100m/ }).click();
+    await page.waitForFunction(() => document.querySelector('#stat-results').textContent === '0');
+    const remove = calls.filter((call) => call.method === 'DELETE').at(-1);
+    assert.equal(remove.url.searchParams.get('user_id'), `eq.${user.id}`);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});

@@ -90,6 +90,9 @@
 .results-panel th { padding: 12px 20px; color: var(--muted); font-weight: 500; font-size: .75rem; background: #f7f6f0; }
 .results-panel td { padding: 17px 20px; border-bottom: 1px solid #16261c10; overflow-wrap: anywhere; }
 .results-panel td:first-child { font-weight: 650; }
+.results-panel td:first-child { white-space: nowrap; }
+.results-panel td:nth-child(2) { min-width: 150px; }
+.results-scroll-hint { display: none; }
 .results-panel td:nth-child(3), .results-panel td:nth-child(4) { white-space: nowrap; }
 .results-panel td:nth-child(4) { font-variant-numeric: tabular-nums; font-weight: 650; }
 .results-panel th:first-child, .results-panel td:first-child { padding-left: 25px; }
@@ -114,6 +117,9 @@
 .dialog-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 15px; border-top: 1px solid var(--line); }
 .dialog-actions .button { border: 0; border-radius: 8px; min-height: 46px; padding-inline: 18px; box-shadow: none; }
 .save-error { border-radius: 8px; padding: 12px; background: #fff0e9; color: #993b24; font-size: .875rem; }
+.result-field textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid #c9d0c7; border-radius: 8px; font: inherit; }
+.results-panel td:last-child .dashboard-text-button { display: block; }
+.delete-result { color: #993b24; }
 @media (max-width: 1200px) {
   .dashboard-sidebar { width: 218px; padding-inline: 17px; }
   .dashboard-brand { font-size: .875rem; }
@@ -160,7 +166,8 @@
   .performance-chart { margin-top: 24px; }
   .chart-footer p { display: none; }
   .bests-note { padding-top: 20px; }
-  .results-panel table { min-width: 630px; }
+  .results-panel table { min-width: 760px; }
+  .results-scroll-hint { display: block; margin: 12px 0 -12px; font-size: .75rem; color: var(--muted); }
   .results-footer { align-items: flex-start; }
   .results-footer > span { max-width: 55%; }
   .dashboard-text-button { white-space: nowrap; }

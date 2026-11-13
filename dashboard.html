@@ -71,10 +71,11 @@
         <section class="account-card results-panel" id="results" aria-labelledby="results-heading">
           <div class="panel-heading"><div><p class="panel-kicker">Your season notebook</p><h2 id="results-heading">Race results <span class="results-count" id="results-count"></span></h2></div><label class="event-control"><span class="sr-only">Filter race results by event</span><select id="results-event" disabled><option value="all">All events</option></select></label></div>
           <p id="results-status" class="panel-empty" role="status" aria-live="polite">Loading your results…</p>
+          <p id="results-scroll-hint" class="results-scroll-hint" hidden>Scroll sideways for times and actions →</p>
           <div class="results-wrap" id="results-wrap" role="region" aria-label="Race results table" tabindex="0" hidden>
             <table>
               <caption class="sr-only">Your saved race results</caption>
-              <thead><tr><th scope="col">Event</th><th scope="col">Meet</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Milestone</th></tr></thead>
+              <thead><tr><th scope="col">Event</th><th scope="col">Meet</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Milestone</th><th scope="col">Actions</th></tr></thead>
               <tbody id="race-results"></tbody>
             </table>
           </div>
@@ -95,6 +96,7 @@
         </div>
         <div class="result-field"><label for="result-meet">Meet name</label><input id="result-meet" name="meet_name" type="text" maxlength="150" placeholder="e.g. City Invitational" required /></div>
         <div class="result-field"><label for="result-time">Your time</label><input id="result-time" name="time" type="text" inputmode="decimal" maxlength="20" placeholder="e.g. 11.84 or 5:12.34" aria-describedby="result-time-hint" required /><p id="result-time-hint">Enter seconds, or minutes:seconds for distance events.</p></div>
+        <div class="result-field"><label for="result-notes">Notes <span>(optional, private)</span></label><textarea id="result-notes" name="notes" maxlength="2000" rows="3" placeholder="How did the race feel?"></textarea></div>
         <p id="save-error" class="save-error" role="alert" hidden></p>
         <div class="dialog-actions"><button class="button button-dark" id="cancel-result" type="button">Cancel</button><button class="button button-primary" id="save-result" type="submit">Save result <span aria-hidden="true">↗</span></button></div>
       </form>

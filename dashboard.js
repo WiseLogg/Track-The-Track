@@ -11,7 +11,8 @@
   const dialog = $('#result-dialog');
   const form = $('#result-form');
   const timeInput = $('#result-time');
-  const fields = 'event,race_date,time_seconds,meet_name';
+  const fields = 'id,event,race_date,time_seconds,meet_name,notes';
+  let editingId = null;
   let user;
   let races = [];
   let loading = false;
@@ -166,6 +167,7 @@
     const selected = seasonRaces().filter((race) => resultsEvent.value === 'all' || race.event === resultsEvent.value).sort((a, b) => chronological(b, a));
     $('#race-results').replaceChildren();
     $('#results-wrap').hidden = !selected.length;
+    $('#results-scroll-hint').hidden = !selected.length;
     $('#results-status').hidden = !!selected.length;
     $('#results-status').textContent = races.length ? 'No results for this season and event. Try another filter or log a result.' : 'Your season starts here. Log your first race result to see your progress.';
     $('#results-count').textContent = selected.length;
@@ -176,6 +178,19 @@
       const milestone = element('td');
       milestone.append(records.has(race) ? element('span', '↗ New PR', 'pr-tag') : element('span', '—'));
       row.append(milestone);
+      const actions = element('td');
+      if (race.id) {
+        const edit = element('button', 'Edit', 'dashboard-text-button');
+        edit.type = 'button';
+        edit.setAttribute('aria-label', `Edit ${race.event} result from ${dateLabel(race.race_date)}`);
+        edit.addEventListener('click', () => openResultForm(race));
+        const remove = element('button', 'Delete', 'dashboard-text-button delete-result');
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Delete ${race.event} result from ${dateLabel(race.race_date)}`);
+        remove.addEventListener('click', () => deleteResult(race));
+        actions.append(edit, remove);
+      }
+      row.append(actions);
       $('#race-results').append(row);
     });
   }
@@ -237,9 +252,13 @@
     }
   }
 
-  function openResultForm() {
+  function openResultForm(race = null) {
+    if (race instanceof Event) race = null;
     if (!user || saving || loading || !loaded) return;
     form.reset();
+    editingId = race?.id || null;
+    $('#result-dialog-heading').textContent = editingId ? 'Edit race result' : 'Log a race result';
+    $('#save-result').textContent = editingId ? 'Save changes ↗' : 'Save result ↗';
     timeInput.setCustomValidity('');
     $('#save-error').hidden = true;
     const today = new Date();
@@ -247,6 +266,14 @@
     $('#result-date').value = localDate;
     $('#result-date').max = localDate;
     if ([...$('#result-event').options].some((option) => option.value === chartEvent.value)) $('#result-event').value = chartEvent.value;
+    if (race) {
+      if (![...$('#result-event').options].some((option) => option.value === race.event)) $('#result-event').add(new Option(race.event, race.event));
+      $('#result-event').value = race.event;
+      $('#result-date').value = race.race_date || '';
+      $('#result-meet').value = race.meet_name || '';
+      $('#result-time').value = validTime(race) ? formatTime(race.time_seconds).replace(/s$/, '') : '';
+      $('#result-notes').value = race.notes || '';
+    }
     dialog.showModal();
   }
 
@@ -271,6 +298,9 @@
     if (!form.reportValidity()) return;
     const accountId = user.id;
     const race = { user_id: accountId, event: $('#result-event').value, race_date: $('#result-date').value, time_seconds: Math.round(seconds * 100) / 100, meet_name: meet.value };
+    const notes = $('#result-notes').value.trim();
+    if (notes || editingId) race.notes = notes || null;
+    const resultId = editingId;
     saving = true;
     $('#save-error').hidden = true;
     form.setAttribute('aria-busy', 'true');
@@ -278,10 +308,14 @@
     $('#save-result').textContent = 'Saving…';
     try {
       // RLS checks ownership on insert; the account ID never comes from the form.
-      const { data, error } = await auth.client.from('race_results').insert(race).select(fields).single();
+      const response = resultId
+          ? await auth.client.from('race_results').update(race).eq('id', resultId).eq('user_id', accountId).select(fields).single()
+          : await auth.client.from('race_results').insert(race).select(fields).single();
+      const { data, error } = response;
       if (error) throw error;
       if (!user || user.id !== accountId) return;
-      races.push(data);
+      if (resultId) races = races.map((item) => item.id === resultId ? data : item);
+      else races.push(data);
       updateSeasons();
       season.value = race.race_date.slice(0, 4);
       resultsEvent.value = 'all';
@@ -289,7 +323,7 @@
       chartEvent.value = race.event;
       renderChart();
       dialog.close();
-      $('#dashboard-feedback').textContent = `${race.event} result saved. Your season is up to date.`;
+      $('#dashboard-feedback').textContent = `${race.event} result ${resultId ? 'updated' : 'saved'}. Your season is up to date.`;
       $('#dashboard-feedback').hidden = false;
     } catch (error) {
       if (!user || user.id !== accountId) return;
@@ -299,9 +333,39 @@
       saving = false;
       form.setAttribute('aria-busy', 'false');
       [...form.elements, $('#close-dialog'), signOut].forEach((control) => { control.disabled = false; });
-      $('#save-result').textContent = 'Save result ↗';
+      $('#save-result').textContent = editingId ? 'Save changes ↗' : 'Save result ↗';
     }
   });
+
+  async function deleteResult(race) {
+    if (!user || saving || !window.confirm(`Delete your ${race.event} result from ${dateLabel(race.race_date)}? This cannot be undone.`)) return;
+    const accountId = user.id;
+    saving = true;
+    document.querySelectorAll('#race-results button').forEach((button) => { button.disabled = true; });
+    $('#log-result').disabled = $('#log-another').disabled = signOut.disabled = true;
+    try {
+      const { error } = await auth.client.from('race_results').delete().eq('id', race.id).eq('user_id', accountId).select('id').single();
+      if (error) throw error;
+      if (!user || user.id !== accountId) return;
+      races = races.filter((item) => item.id !== race.id);
+      updateSeasons();
+      render();
+      $('#dashboard-feedback').textContent = 'Result deleted. Your charts and personal bests are up to date.';
+      $('#dashboard-feedback').hidden = false;
+    } catch (error) {
+      if (!redirecting) {
+        $('#dashboard-feedback').textContent = `Your result couldn’t be deleted. ${auth.errorMessage(error)}`;
+        $('#dashboard-feedback').hidden = false;
+      }
+    } finally {
+      saving = false;
+      if (!redirecting) {
+        document.querySelectorAll('#race-results button').forEach((button) => { button.disabled = false; });
+        $('#log-result').disabled = $('#log-another').disabled = signOut.disabled = false;
+        $('#log-result').focus();
+      }
+    }
+  }
 
   season.addEventListener('change', render);
   chartEvent.addEventListener('change', renderChart);
