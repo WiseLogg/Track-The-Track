@@ -910,3 +910,22 @@ test('signup confirmation callbacks establish a session and expired links show a
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
+
+test('public pages fit small screens and settings require a signed-in account', async () => {
+  const { context, page, errors } = await setup(undefined, { width: 320, height: 844 });
+  try {
+    for (const file of ['index.html', 'privacy.html']) {
+      await page.goto(`${origin}/${file}`);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${file} overflow`);
+    }
+    await page.goto(`${origin}/index.html`);
+    assert.equal(await page.locator('.site-footer a[href="privacy.html"]').isVisible(), true);
+    await page.locator('.nav-toggle').click();
+    assert.equal(await page.locator('.nav-toggle').getAttribute('aria-expanded'), 'true');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('.nav-toggle').getAttribute('aria-expanded'), 'false');
+    await page.goto(`${origin}/settings.html`);
+    await page.waitForURL('**/login.html');
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
