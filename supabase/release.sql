@@ -103,4 +103,47 @@ $$;
 revoke all on function public.review_reports(), public.resolve_content_report(uuid, boolean) from public, anon;
 grant execute on function public.review_reports(), public.resolve_content_report(uuid, boolean) to authenticated;
 
+create table private.posting_limits (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  kind text not null,
+  window_start timestamptz not null,
+  count integer not null,
+  primary key (user_id, kind, window_start)
+);
+alter table private.posting_limits enable row level security;
+create policy "No browser access" on private.posting_limits for all to anon, authenticated using (false) with check (false);
+revoke all on private.posting_limits from public, anon, authenticated;
+-- Runs only as a table trigger; callers cannot submit counter values or timestamps.
+-- Atomic upsert also covers simultaneous requests and deleting/reposting content.
+create function private.enforce_post_limit() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  actor uuid := auth.uid();
+  used integer;
+  maximum integer;
+begin
+  if actor is null then return new; end if; -- SQL editor / service seeding only.
+  maximum := case TG_TABLE_NAME when 'workouts' then 10 when 'workout_comments' then 60 else 20 end;
+  if TG_TABLE_NAME = 'content_reports' then
+    if new.target_type = 'workout' and not exists (select 1 from public.workouts where id = new.target_id)
+      or new.target_type = 'comment' and not exists (select 1 from public.workout_comments where id = new.target_id) then
+      raise exception 'This content is no longer available.' using errcode = '23514';
+    end if;
+  end if;
+  delete from private.posting_limits where user_id = actor and window_start < now() - interval '1 day';
+  insert into private.posting_limits (user_id, kind, window_start, count)
+  values (actor, TG_TABLE_NAME, date_trunc('hour', now()), 1)
+  on conflict (user_id, kind, window_start) do update set count = private.posting_limits.count + 1
+  returning count into used;
+  if used > maximum then
+    raise exception 'Hourly posting limit reached. Please try again later.' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function private.enforce_post_limit() from public, anon, authenticated;
+create trigger limit_workout_posts before insert on public.workouts for each row execute function private.enforce_post_limit();
+create trigger limit_comment_posts before insert on public.workout_comments for each row execute function private.enforce_post_limit();
+create trigger limit_reports before insert on public.content_reports for each row execute function private.enforce_post_limit();
+
 notify pgrst, 'reload schema';

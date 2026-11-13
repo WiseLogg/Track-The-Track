@@ -328,9 +328,9 @@
       $('#sort-order').value = 'newest';
       setCollection('mine');
       feedback('Workout published! Other athletes can now find, save, and comment on your session.');
-    } catch {
+    } catch (error) {
       if (redirecting) return;
-      $('#create-error').textContent = 'We couldn’t publish your workout. Your draft is still here; please try again.';
+      $('#create-error').textContent = `We couldn’t publish your workout. Your draft is still here. ${auth.errorMessage(error)}`;
       $('#create-error').hidden = false;
     } finally {
       publishing = false;
@@ -360,8 +360,8 @@
         await loadComments();
       }
       renderCards();
-    } catch {
-      if (!redirecting && selected?.id === workout.id) feedback('We couldn’t post your comment. Your text is still here; please try again.', true);
+    } catch (error) {
+      if (!redirecting && selected?.id === workout.id) feedback(`We couldn’t post your comment. Your text is still here. ${auth.errorMessage(error)}`, true);
     } finally {
       posting = false;
       $('#post-comment').disabled = false;
