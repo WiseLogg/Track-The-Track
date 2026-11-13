@@ -788,6 +788,71 @@ test('confirmation resend uses the signup callback, handles failure, and enforce
   } finally { await context.close(); }
 });
 
+async function settingsSetup(handler, viewport) {
+  const result = await setup(handler, viewport);
+  await result.context.addInitScript((stored) => { if (!sessionStorage.getItem('test-session-initialized')) { localStorage.setItem('track-the-track.auth', JSON.stringify(stored)); sessionStorage.setItem('test-session-initialized', 'true'); } }, { ...session, expires_at: Math.floor(Date.now() / 1000) + 3600 });
+  await result.page.goto(`${origin}/settings.html`);
+  await result.page.locator('#account-content').waitFor({ state: 'visible' });
+  return result;
+}
+test('settings update the display name, export only owned data, and fit mobile screens', async () => {
+  const { context, page, calls, errors } = await settingsSetup((call) => {
+    if (call.url.pathname.endsWith('/is_moderator')) return { status: 200, body: false };
+    if (call.url.pathname.startsWith('/rest/v1/')) return { status: 200, body: [] };
+    return null;
+  });
+  try {
+    await page.locator('#display-name').fill('New athlete');
+    await page.locator('#profile-form button').click();
+    await page.waitForFunction(() => document.querySelector('#settings-feedback').textContent.includes('updated'));
+    const profile = calls.find((call) => call.url.pathname === '/auth/v1/user' && call.method === 'PUT');
+    assert.deepEqual(profile.body.data, { display_name: 'New athlete' });
+    assert.equal(await page.locator('#moderation-panel').isVisible(), false);
+    const downloaded = page.waitForEvent('download');
+    await page.locator('#export-account').click();
+    const data = JSON.parse(await fs.readFile(await (await downloaded).path(), 'utf8'));
+    assert.equal(data.profile.email, user.email);
+    assert.equal(JSON.stringify(data).includes(token), false);
+    const queries = calls.filter((call) => call.url.pathname.startsWith('/rest/v1/') && call.method === 'GET');
+    assert.equal(queries.length, 5);
+    queries.forEach((call) => assert.equal(call.url.searchParams.get('user_id'), `eq.${user.id}`));
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `settings overflow at ${width}`);
+    }
+    if (process.env.TRACK_DASHBOARD_SCREENSHOTS) {
+      await fs.mkdir('/tmp/track-release-validation', { recursive: true });
+      await page.screenshot({ path: '/tmp/track-release-validation/settings.png', fullPage: true });
+    }
+    await page.locator('#open-delete-account').click();
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#open-delete-account').evaluate((button) => button === document.activeElement), true);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('account deletion requires explicit confirmation and preserves the account on server failure', async () => {
+  let fail = true;
+  const { context, page, calls, errors } = await settingsSetup((call) => call.url.pathname.endsWith('/delete-account') ? fail ? { status: 401, body: { error: 'Wrong password' } } : { status: 200, body: { deleted: true } } : call.url.pathname.endsWith('/is_moderator') ? { status: 200, body: false } : null);
+  try {
+    await page.locator('#open-delete-account').click();
+    await page.locator('#delete-password').fill('test-password');
+    await page.locator('#delete-account-submit').click();
+    assert.equal(calls.some((call) => call.url.pathname.endsWith('/delete-account')), false);
+    await page.locator('#delete-confirmation').fill('DELETE');
+    await page.locator('#delete-account-submit').click();
+    await page.locator('#delete-account-error').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#account-content').isVisible(), true);
+    assert.equal(await page.locator('#delete-password').inputValue(), '');
+    fail = false;
+    await page.locator('#delete-password').fill('test-password');
+    await page.locator('#delete-account-submit').click();
+    await page.waitForURL('**/login.html');
+    assert.equal(await page.evaluate(() => localStorage.getItem('track-the-track.auth')), null);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
 test('signup confirmation callbacks establish a session and expired links show a useful message', async () => {
   const { context, page, errors } = await setup();
   try {

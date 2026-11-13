@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="referrer" content="no-referrer"/><meta name="theme-color" content="#10261f"/>
+  <title>Account settings | Track The Track</title>
+  <link rel="stylesheet" href="style.css"/><link rel="stylesheet" href="dashboard.css"/><link rel="stylesheet" href="settings.css"/>
+  <script src="script.js" defer></script>
+    <script src="vendor/supabase.js" defer></script><script src="auth.js" defer></script>
+  <script src="data-export.js" defer></script><script src="settings.js" defer></script>
+</head>
+<body class="dashboard-page settings-page">
+  <a class="skip-link" href="#account-main">Skip to account settings</a>
+    <aside class="dashboard-sidebar">
+        <a class="brand dashboard-brand" href="index.html" aria-label="Track The Track home">
+          <svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="17" /><circle cx="21" cy="21" r="10" /><path d="M21 4v34" /></svg>
+          <span>Track <em>the</em> Track</span>
+        </a>
+        <p class="sidebar-label">Your workspace</p>
+        <nav class="dashboard-nav" aria-label="Dashboard navigation">
+          <a href="dashboard.html#overview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>
+          <a href="dashboard.html#progress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18M6 15l5-5 4 3 6-8"/></svg>My progress</a>
+          <a href="dashboard.html#results"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Race results</a>
+          <a href="dashboard.html#bests"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="m8 14-1 7 5-3 5 3-1-7"/></svg>Personal bests</a>
+          <a href="workouts.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 4-3 6 5 3-2 7M5 13l5-3M15 13h5"/><circle cx="16" cy="4" r="2"/></svg>Workouts</a>
+          <a class="is-active" href="settings.html" aria-current="page">Account settings</a>
+        </nav>
+        <div class="sidebar-track" aria-hidden="true"><span></span><span></span><span></span><i></i></div>
+        <div class="sidebar-bottom">
+          <div class="athlete-profile"><span class="profile-avatar" id="profile-initials" aria-hidden="true">TT</span><div><strong id="profile-name">My account</strong><span>Athlete</span></div></div>
+          <button id="sign-out" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v16h5M9 12h12m-4-4 4 4-4 4"/></svg>Sign out</button>
+        </div>
+    </aside>
+    <main class="account-main" id="account-main" tabindex="-1">
+      <div class="dashboard-topbar"><span>Account settings</span><a href="dashboard.html">Back to dashboard ↗</a></div>
+      <p id="account-status" class="dashboard-notice" role="status">Checking your account…</p>
+      <section id="account-content" hidden>
+        <header class="dashboard-heading"><div><p class="eyebrow"><span></span>Your account. Your choices.</p><h1>Make it <em>yours.</em></h1><p class="dashboard-intro">Manage your display name, download your data, and control your account.</p></div></header>
+        <p id="settings-feedback" class="dashboard-notice" role="status" aria-live="polite" hidden></p>
+        <div class="settings-grid">
+          <section class="account-card" aria-labelledby="profile-heading"><h2 id="profile-heading">Your profile</h2>
+            <p>Signed in as <strong id="account-email"></strong></p>
+            <form id="profile-form"><div class="result-field"><label for="display-name">Display name</label><input id="display-name" required maxlength="80" autocomplete="name"/><p>Your name appears on new workouts and comments. Existing posts keep the name they were published with.</p></div><button class="button button-primary" type="submit">Save profile</button></form>
+            <p><button type="button" class="dashboard-text-button" id="request-password-reset">Send me a password reset email</button></p>
+          </section>
+          <section class="account-card" aria-labelledby="data-heading"><h2 id="data-heading">Your data</h2><p>Your race results, notes, and saved favorites are private. Published workouts, display names, likes, and comments are visible to signed-in athletes.</p><p>Download a JSON copy of your profile and the results, workouts, comments, likes, and favorites belonging to your account.</p><button class="button button-dark" type="button" id="export-account">Download my data ↓</button><p><a href="https://github.com/WiseLogg/Track-The-Track/issues" target="_blank" rel="noopener noreferrer">Report a website bug ↗</a> — don’t include passwords or private race data.</p></section>
+        </div>
+        <section class="account-card danger-panel" aria-labelledby="delete-heading"><h2 id="delete-heading">Delete your account</h2><p>This permanently removes your account, race results, private saves, likes, published workouts, and comments. Download your data first if you want to keep a copy.</p><button type="button" class="dashboard-text-button" id="open-delete-account">Delete my account…</button></section>
+      </section>
+      <noscript>Please enable JavaScript to manage your account.</noscript>
+    </main>
+    <dialog class="result-dialog" id="delete-account-dialog" aria-labelledby="delete-account-heading"><div class="dialog-heading"><h2 id="delete-account-heading">Permanently delete account?</h2><button class="close-dialog" type="button" id="close-delete-account" aria-label="Close account deletion">×</button></div><p>This cannot be undone. Your password is checked securely before your account is removed.</p><form id="delete-account-form"><div class="result-field"><label for="delete-password">Current password</label><input id="delete-password" type="password" autocomplete="current-password" required/></div><div class="result-field"><label for="delete-confirmation">Type DELETE to confirm</label><input id="delete-confirmation" autocomplete="off" required pattern="DELETE"/></div><p id="delete-account-error" class="save-error" role="alert" hidden></p><div class="dialog-actions"><button class="button button-dark" id="cancel-delete-account" type="button">Keep my account</button><button class="button button-primary" id="delete-account-submit" type="submit">Delete account permanently</button></div></form></dialog>
+</body>
+</html>

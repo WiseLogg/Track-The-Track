@@ -1,0 +1,9 @@
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.settings-page .account-card h2 { margin-top: 0; font-size: 1.25rem; }
+.settings-page .account-card p { color: var(--ink-soft); font-size: .875rem; overflow-wrap: anywhere; }
+.settings-page .account-card a { text-decoration: underline; text-underline-offset: 3px; }
+.settings-page .button { border: 0; border-radius: 8px; }
+.danger-panel { margin-top: 24px; }
+.danger-panel { border-color: #dec1b4; }
+.danger-panel .dashboard-text-button { color: #993b24; }
+@media (max-width: 700px) { .settings-grid { grid-template-columns: 1fr; } }

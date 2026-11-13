@@ -1,0 +1,6 @@
+project_id = "track-the-track"
+
+[functions.delete-account]
+# The handler validates the bearer token with Auth.getUser and checks the password.
+# This supports asymmetric signing keys as well as legacy JWTs.
+verify_jwt = false

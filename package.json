@@ -5,7 +5,7 @@
   "description": "Static Track The Track website with Supabase authentication",
   "scripts": {
     "build": "node scripts/vendor-supabase.mjs",
-    "test": "node --test tests/auth.test.cjs"
+    "test": "node --test tests/auth.test.cjs tests/delete-account.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2"
