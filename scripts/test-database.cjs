@@ -9,7 +9,9 @@ async function main() {
     docker(['run', '--detach', '--rm', '--network', 'none', '--name', name, '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', 'postgres:17']);
     let ready = false;
     for (let i = 0; i < 60; i++) {
-      try { docker(['exec', name, 'pg_isready', '-U', 'postgres'], { stdio: 'pipe' }); ready = true; break; } catch {}
+      // Docker's temporary initialization server accepts Unix sockets, then stops.
+      // TCP is available only after initialization, when the final server starts.
+      try { docker(['exec', name, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'postgres'], { stdio: 'pipe' }); ready = true; break; } catch {}
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     if (!ready) throw new Error('Disposable PostgreSQL did not become ready.');
