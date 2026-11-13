@@ -7,6 +7,8 @@
   const createDialog = $('#create-dialog');
   const detailDialog = $('#detail-dialog');
   const locks = new Set();
+  const reportDialog = $('#report-dialog');
+  let reportTarget, reporting = false;
   let user, displayName, selected, detailOpener;
   let rows = [], comments = [];
   let collection = 'all', offset = 0, total = 0;
@@ -36,6 +38,7 @@
     commentsRequest++;
     user = selected = null;
     rows = comments = [];
+    reportDialog.close();
     createDialog.close();
     detailDialog.close();
     $('#account-content').hidden = true;
@@ -243,9 +246,15 @@
       const heading = element('header');
       heading.append(element('strong', comment.author_name), element('span', dateLabel(comment.created_at)));
       item.append(heading, element('p', comment.body));
+      const report = element('button', 'Report comment');
+      report.type = 'button';
+      report.dataset.action = 'report-comment';
+      report.addEventListener('click', () => openReport('comment', comment.id));
+      item.append(report);
       if (comment.user_id === user.id) {
         const remove = element('button', 'Delete my comment');
         remove.type = 'button';
+        remove.dataset.action = 'delete-comment';
         remove.addEventListener('click', () => deleteComment(comment, remove));
         item.append(remove);
       }
@@ -390,6 +399,35 @@
       feedback('Your workout and its discussion were deleted.');
     } catch { if (!redirecting) feedback('We couldn’t delete your workout. Please try again.', true); }
     finally { deleting = false; $('#delete-workout').disabled = false; }
+  });
+
+  function openReport(type, id) {
+    reportTarget = { type, id };
+    $('#report-form').reset();
+    $('#report-error').hidden = true;
+    reportDialog.showModal();
+  }
+  $('#report-workout').addEventListener('click', () => { if (selected) openReport('workout', selected.id); });
+  ['#close-report', '#cancel-report'].forEach((selector) => $(selector).addEventListener('click', () => { if (!reporting) reportDialog.close(); }));
+  reportDialog.addEventListener('cancel', (event) => { if (reporting) event.preventDefault(); });
+  $('#report-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (reporting || !user || !reportTarget) return;
+    reporting = true;
+    reportDialog.querySelectorAll('button, input, select, textarea').forEach((control) => { control.disabled = true; });
+    $('#report-error').hidden = true;
+    try {
+      const { error } = await auth.client.from('content_reports').insert({ user_id: user.id, target_type: reportTarget.type, target_id: reportTarget.id, reason: $('#report-reason').value, details: $('#report-details').value.trim() });
+      if (error && error.code !== '23505') throw error;
+      if (redirecting) return;
+      reportDialog.close();
+      feedback(error ? 'You’ve already reported this content. A moderator can review your report.' : 'Report sent. Thank you for helping the community.', detailDialog.open);
+    } catch (error) {
+      if (!redirecting) { $('#report-error').textContent = `Your report couldn’t be sent. ${auth.errorMessage(error)}`; $('#report-error').hidden = false; }
+    } finally {
+      reporting = false;
+      reportDialog.querySelectorAll('button, input, select, textarea').forEach((control) => { control.disabled = false; });
+    }
   });
 
   function clearFilters() {

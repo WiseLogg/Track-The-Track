@@ -3,7 +3,10 @@
 .settings-page .account-card p { color: var(--ink-soft); font-size: .875rem; overflow-wrap: anywhere; }
 .settings-page .account-card a { text-decoration: underline; text-underline-offset: 3px; }
 .settings-page .button { border: 0; border-radius: 8px; }
-.danger-panel { margin-top: 24px; }
+.danger-panel, .moderation-panel { margin-top: 24px; }
 .danger-panel { border-color: #dec1b4; }
 .danger-panel .dashboard-text-button { color: #993b24; }
+.report-card { padding-block: 20px; border-top: 1px solid var(--line); }
+.report-card p { white-space: pre-wrap; }
+.report-card button { margin-right: 20px; }
 @media (max-width: 700px) { .settings-grid { grid-template-columns: 1fr; } }

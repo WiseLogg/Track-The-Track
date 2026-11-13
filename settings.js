@@ -17,6 +17,7 @@
     redirecting = true;
     user = null;
     $('#account-content').hidden = true;
+    $('#moderation-reports').replaceChildren();
     dialog.close();
     window.location.replace('login.html');
   }
@@ -72,6 +73,7 @@
         ['workouts', 'id,title,description,category,difficulty,duration_minutes,steps,created_at,author_name'],
         ['workout_comments', 'id,workout_id,body,created_at,author_name'],
         ['workout_likes', 'workout_id', 'workout_id'], ['workout_favorites', 'workout_id', 'workout_id'],
+        ['content_reports', 'id,target_type,target_id,reason,details,status,created_at'],
       ];
       const rows = await Promise.all(tables.map(([table, fields, order]) => ownRows(table, fields, order)));
       if (redirecting) return;
@@ -111,6 +113,37 @@
     }
   });
 
+  function node(tag, text) { const item = document.createElement(tag); item.textContent = text; return item; }
+  async function loadReports() {
+    $('#moderation-status').textContent = 'Loading reports…';
+    $('#moderation-reports').replaceChildren();
+    try {
+      const { data, error } = await auth.client.rpc('review_reports');
+      if (error) throw error;
+      if (redirecting) return;
+      $('#moderation-status').textContent = data.length ? `${data.length} open reports` : 'No open reports. You’re all caught up.';
+      data.forEach((report) => {
+        const card = document.createElement('article'); card.className = 'report-card';
+        card.append(node('h3', `${report.target_type === 'workout' ? 'Workout' : 'Comment'} · ${report.reason}`), node('p', report.preview), node('p', report.details));
+        [['Dismiss report', false], ['Remove content', true]].forEach(([label, remove]) => {
+          const button = node('button', label); button.type = 'button'; button.className = 'dashboard-text-button';
+          button.addEventListener('click', async () => {
+            if (busy || (remove && !window.confirm('Permanently remove this content? Removing a workout also removes its comments, likes, and saves.'))) return;
+            setBusy(true);
+            try {
+              const { error } = await auth.client.rpc('resolve_content_report', { report_id: report.id, remove_content: remove });
+              if (error) throw error;
+              if (!redirecting) { feedback(remove ? 'Content removed and report resolved.' : 'Report dismissed.'); await loadReports(); }
+            } catch (error) { if (!redirecting) feedback(auth.errorMessage(error)); }
+            finally { if (!redirecting) setBusy(false); }
+          });
+          card.append(button);
+        });
+        $('#moderation-reports').append(card);
+      });
+    } catch { if (!redirecting) $('#moderation-status').textContent = 'Reports couldn’t load. Please refresh reports to try again.'; }
+  }
+  $('#refresh-reports').addEventListener('click', () => { if (!busy) loadReports(); });
   $('#sign-out').addEventListener('click', async () => {
     if (busy) return;
     setBusy(true);
@@ -134,6 +167,10 @@
       $('#account-email').textContent = user.email;
       $('#account-status').hidden = true; $('#account-content').hidden = false;
       setBusy(false);
+      const role = await auth.client.rpc('is_moderator');
+      if (redirecting) return;
+      if (role.error) feedback('Community moderation status couldn’t load. Refresh this page to try again.');
+      else if (role.data === true) { $('#moderation-panel').hidden = false; await loadReports(); }
     } catch (error) { if (!redirecting) $('#account-status').textContent = auth.errorMessage(error); }
   }
   initialize();

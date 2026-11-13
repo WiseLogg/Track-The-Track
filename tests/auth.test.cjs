@@ -595,7 +595,7 @@ test('comments are paginated, persistent, safe text, and only owners get delete 
   try {
     await page.locator('.workout-card').first().locator('[data-action="comments"]').click();
     await page.waitForFunction(() => document.querySelectorAll('.comment').length === 20);
-    assert.equal(await page.locator('.comment button').count(), 0);
+    assert.equal(await page.locator('.comment [data-action="delete-comment"]').count(), 0);
     await page.locator('#more-comments').click();
     await page.waitForFunction(() => document.querySelectorAll('.comment').length === 23);
     fixture.fail('workout_comments');
@@ -611,9 +611,9 @@ test('comments are paginated, persistent, safe text, and only owners get delete 
     assert.equal(await page.evaluate(() => window.hacked), undefined);
     const post = calls.filter((c) => c.url.pathname.endsWith('workout_comments') && c.method === 'POST').at(-1);
     assert.equal(post.body.user_id, user.id);
-    assert.equal(await page.locator('.comment button').count(), 1);
+    assert.equal(await page.locator('.comment [data-action="delete-comment"]').count(), 1);
     page.once('dialog', (dialog) => dialog.accept());
-    await page.locator('.comment button').click();
+    await page.locator('.comment [data-action="delete-comment"]').click();
     await page.waitForFunction(() => document.querySelector('#detail-feedback').textContent.includes('deleted'));
     await page.waitForFunction(() => document.querySelector('#comment-count').textContent === '23 total');
     await page.keyboard.press('Escape');
@@ -814,7 +814,7 @@ test('settings update the display name, export only owned data, and fit mobile s
     assert.equal(data.profile.email, user.email);
     assert.equal(JSON.stringify(data).includes(token), false);
     const queries = calls.filter((call) => call.url.pathname.startsWith('/rest/v1/') && call.method === 'GET');
-    assert.equal(queries.length, 5);
+    assert.equal(queries.length, 6);
     queries.forEach((call) => assert.equal(call.url.searchParams.get('user_id'), `eq.${user.id}`));
     for (const width of [320, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 844 });
@@ -849,6 +849,49 @@ test('account deletion requires explicit confirmation and preserves the account 
     await page.locator('#delete-account-submit').click();
     await page.waitForURL('**/login.html');
     assert.equal(await page.evaluate(() => localStorage.getItem('track-the-track.auth')), null);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('athletes can report content and duplicate reports give a clear outcome', async () => {
+  const fixture = workoutFixture();
+  let duplicate = false;
+  const { context, page, calls, errors } = await workoutsSetup((call) => call.url.pathname.endsWith('/content_reports') ? duplicate ? { status: 409, body: { code: '23505' } } : { status: 201, body: null } : fixture.handler(call));
+  try {
+    await page.locator('.workout-title-button').first().click();
+    for (let i = 0; i < 2; i++) {
+      await page.locator('#report-workout').click();
+      await page.locator('#report-reason').selectOption('Unsafe advice');
+      await page.locator('#report-details').fill('Please review this session.');
+      await page.locator('#submit-report').click();
+      await page.locator('#report-dialog').waitFor({ state: 'hidden' });
+      duplicate = true;
+    }
+    assert.match(await page.locator('#detail-feedback').textContent(), /already reported/);
+    const report = calls.find((call) => call.url.pathname.endsWith('/content_reports'));
+    assert.equal(report.body.user_id, user.id);
+    assert.equal(report.body.target_id, fixture.workouts[0].id);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('moderators can review and resolve reports without rendering submitted HTML', async () => {
+  let reports = [{ id: 'report-1', target_type: 'comment', target_id: 'comment-1', reason: 'Spam', details: 'Review please', preview: '<img src=x onerror="window.hacked=true">' }];
+  const { context, page, calls, errors } = await settingsSetup((call) => {
+    if (call.url.pathname.endsWith('/is_moderator')) return { status: 200, body: true };
+    if (call.url.pathname.endsWith('/review_reports')) return { status: 200, body: reports };
+    if (call.url.pathname.endsWith('/resolve_content_report')) { reports = []; return { status: 200, body: null }; }
+    return null;
+  });
+  try {
+    await page.locator('.report-card').waitFor();
+    assert.equal(await page.locator('.report-card img').count(), 0);
+    assert.equal(await page.evaluate(() => window.hacked), undefined);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Remove content', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#moderation-status').textContent.includes('No open reports'));
+    const resolve = calls.find((call) => call.url.pathname.endsWith('/resolve_content_report'));
+    assert.deepEqual(resolve.body, { report_id: 'report-1', remove_content: true });
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });

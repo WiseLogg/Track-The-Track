@@ -100,7 +100,13 @@
         <form id="comment-form"><label class="sr-only" for="comment-body">Write a comment</label><textarea id="comment-body" name="comment" rows="3" maxlength="1000" required placeholder="How did this session go?"></textarea><button type="submit" id="post-comment" class="button button-primary">Post comment</button></form>
         <p id="comments-status" role="status" aria-live="polite"></p><button type="button" id="retry-comments" class="dashboard-text-button" hidden>Retry comments</button><div id="comment-list"></div><button type="button" id="more-comments" class="dashboard-text-button" hidden>Load more comments</button>
       </section>
+      <button id="report-workout" type="button" class="dashboard-text-button">Report this workout</button>
       <button id="delete-workout" type="button" class="delete-workout" hidden>Delete my workout</button>
+    </dialog>
+    <dialog id="report-dialog" class="result-dialog" aria-labelledby="report-heading">
+      <div class="dialog-heading"><h2 id="report-heading">Report content</h2><button class="close-dialog" type="button" id="close-report" aria-label="Close report form">×</button></div>
+      <p>Reports are private to you and the site moderators. Help us keep the community useful and respectful.</p>
+      <form id="report-form"><div class="result-field"><label for="report-reason">Reason</label><select id="report-reason" required><option>Spam</option><option>Unsafe advice</option><option>Harassment</option><option>Other</option></select></div><div class="result-field"><label for="report-details">Details (optional)</label><textarea id="report-details" maxlength="1000" rows="3"></textarea></div><p id="report-error" class="save-error" role="alert" hidden></p><div class="dialog-actions"><button class="button button-dark" id="cancel-report" type="button">Cancel</button><button class="button button-primary" id="submit-report" type="submit">Send report</button></div></form>
     </dialog>
   </body>
 </html>
